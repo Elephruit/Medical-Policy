@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { loadText, useData } from "../data";
-import type { PolicyText } from "../types";
+import { loadAnalysis, loadText, useData } from "../data";
+import type { Comparison, PolicyText } from "../types";
 import { SourceChip } from "../components/Bits";
+import { ComparisonView } from "../components/Comparison";
 
 export default function Topic() {
   const { id } = useParams();
   const { topicById, byId } = useData();
   const topic = topicById.get(Number(id));
   const [texts, setTexts] = useState<Record<string, PolicyText>>({});
+  const [cmp, setCmp] = useState<Comparison | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    loadAnalysis().then((a) => {
+      if (live) setCmp(a.comparisons.find((c) => c.topic_id === Number(id)) || null);
+    });
+    return () => { live = false; };
+  }, [id]);
 
   const members = useMemo(
     () => (topic ? topic.members.map((m) => byId.get(m)!).filter(Boolean) : []),
@@ -49,10 +59,19 @@ export default function Topic() {
               ? `Compared across ${topic.sources.length} payers`
               : "Single-payer topic"}{" "}
             · {topic.size} policies
+            {cmp?.llm_matched && <span className="ai-badge" title="Matched by AI subject normalization">AI-matched</span>}
           </p>
         </div>
       </div>
 
+      {cmp && (
+        <section className="topic-analysis">
+          <h2 className="topic-analysis-h">Coverage comparison</h2>
+          <ComparisonView c={cmp} />
+        </section>
+      )}
+
+      <h2 className="topic-analysis-h">Each payer's policy</h2>
       <div className="compare-grid" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(280px, 1fr))` }}>
         {columns.map(([source, ps]) => (
           <div key={source} className="compare-col">

@@ -291,6 +291,18 @@ a { color: inherit; text-decoration: none; }
 .restr-bar-n { font-size: 13px; font-weight: 700; white-space: nowrap; }
 .restr-bar-sub { font-weight: 500; color: var(--dim); font-size: 11.5px; }
 
+/* restrictiveness chip (compare list rows) */
+.restr-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  white-space: nowrap; color: #fff; }
+.restr-chip.src-bcbsfl { background: var(--bcbs); }
+.restr-chip.src-oscar { background: var(--oscar); }
+
+/* topic page: analysis block above the per-policy columns */
+.topic-analysis { background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 22px; }
+.topic-analysis-h { font-size: 16px; margin: 0 0 12px; }
+.topic-analysis .cmp-body { padding: 0; border: none; margin: 0; }
+
 /* AI-matched badge */
 .ai-badge { margin-left: 8px; font-size: 10px; font-weight: 800; text-transform: uppercase;
   letter-spacing: .03em; color: #6b4fbb; background: #f3f0fb; padding: 2px 7px; border-radius: 5px;

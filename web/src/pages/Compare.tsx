@@ -1,12 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useData } from "../data";
+import { loadAnalysis, useData } from "../data";
+import type { Comparison } from "../types";
 import { SourceChip, ScoreBadge } from "../components/Bits";
+import { RestrictivenessChip } from "../components/Comparison";
 
 export default function Compare() {
   const { topics } = useData();
   const [q, setQ] = useState("");
   const [crossOnly, setCrossOnly] = useState(true);
+  const [cmpById, setCmpById] = useState<Map<number, Comparison>>(new Map());
+
+  useEffect(() => {
+    loadAnalysis().then((a) =>
+      setCmpById(new Map(a.comparisons.map((c) => [c.topic_id, c])))
+    );
+  }, []);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -55,10 +64,19 @@ export default function Compare() {
         {rows.map((t) => (
           <Link key={t.topic_id} to={`/topic/${t.topic_id}`} className="topic-row">
             <div className="topic-main">
-              <span className="topic-label">{t.label}</span>
+              <span className="topic-label">
+                {t.label}
+                {cmpById.get(t.topic_id)?.llm_matched && (
+                  <span className="ai-badge" title="Matched by AI subject normalization">AI-matched</span>
+                )}
+              </span>
               <span className="topic-meta">{t.size} policies</span>
             </div>
             <div className="topic-side">
+              {(() => {
+                const c = cmpById.get(t.topic_id);
+                return c ? <RestrictivenessChip c={c} /> : null;
+              })()}
               {t.sources.map((s) => (
                 <SourceChip key={s} source={s} />
               ))}
