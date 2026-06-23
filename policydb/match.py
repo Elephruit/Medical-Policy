@@ -21,19 +21,31 @@ STOP = set(
     "florida blue services service therapy therapies treatment treatments "
     "tablet tablets capsule capsules oral injection injectable injections solution "
     "cream powder products product approved accepted off label necessity per ver "
-    "version brand generic iv sq im subcutaneous intravenous infusion".split()
+    "version brand generic iv sq im subcutaneous intravenous infusion "
+    "agent agents preferred physician administered exceptions criteria benefit".split()
 )
 # Strip embedded codes: (CG013, Ver. 11), (PG264, Ver. 3), 09-E0000-14.
 CODE = re.compile(
     r"\([A-Za-z]{1,5}\d+[A-Za-z]?(?:\s*,?\s*ver\.?\s*\d+)?\)|\b\d{2}-[A-Z0-9]{4,6}-\d{1,3}\b",
     re.I,
 )
+_SUFFIXES = ("ation", "ization", "ising", "izing", "ing", "ions", "ion", "ents", "ent", "ers", "es", "s")
+
+
+def _stem(w: str) -> str:
+    """Light suffix stemmer so inhibitor/inhibitors and affirming/affirmation align."""
+    for suf in _SUFFIXES:
+        if w.endswith(suf) and len(w) - len(suf) >= 4:
+            return w[: -len(suf)]
+    return w
 
 
 def tokenize(title: str) -> List[str]:
+    # Hyphens become spaces, so "Bio-Engineered" -> "bio engineered" and
+    # "Gender-Affirming" -> "gender affirming" (both match their unhyphenated forms).
     t = CODE.sub(" ", title).lower()
     t = re.sub(r"[^a-z0-9 ]", " ", t)
-    return [w for w in t.split() if w not in STOP and len(w) > 2]
+    return [_stem(w) for w in t.split() if w not in STOP and len(w) > 2]
 
 
 class _UnionFind:
@@ -53,7 +65,7 @@ class _UnionFind:
 
 
 def build_topics(
-    docs: List[dict], threshold: float = 0.5
+    docs: List[dict], threshold: float = 0.40
 ) -> Tuple[Dict[str, int], List[dict]]:
     """docs: [{id, source, title, policy_id}]. Returns (id->topic_id, topics)."""
     toks = [tokenize(d["title"]) for d in docs]
@@ -101,6 +113,11 @@ def build_topics(
     for w, members in by_token.items():
         if len(members) > 400:  # ultra-common token — skip as a blocking key
             continue
+        # A near-unique term shared across payers (a drug name, "viscosupplementation",
+        # "ciltacabtagene") is decisive on its own — link regardless of cosine. This
+        # rescues long/verbose titles whose cosine is diluted. df<=3 keeps it safe:
+        # moderately common words like "growth" or "tissue" never qualify.
+        rare = df[w] <= 3 and len(w) >= 7
         for a_i in range(len(members)):
             i = members[a_i]
             for b_i in range(a_i + 1, len(members)):
@@ -112,10 +129,14 @@ def build_topics(
                     continue
                 checked.add(key)
                 sc = cos(vecs[i], vecs[j])
-                if sc >= threshold:
+                # The rare term only *rescues* a borderline pair (cosine floor 0.28),
+                # never creates one from a single generic word like "accessories"
+                # (which would otherwise chain unrelated topics via union-find).
+                if sc >= threshold or (rare and sc >= 0.28):
                     uf.union(i, j)
-                    scores[i] = max(scores.get(i, 0), sc)
-                    scores[j] = max(scores.get(j, 0), sc)
+                    link = max(sc, 0.9) if rare else sc
+                    scores[i] = max(scores.get(i, 0), link)
+                    scores[j] = max(scores.get(j, 0), link)
 
     # Assemble components into topics.
     comp: Dict[int, List[int]] = defaultdict(list)
