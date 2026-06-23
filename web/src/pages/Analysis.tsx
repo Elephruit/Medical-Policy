@@ -193,6 +193,16 @@ function FindingCard({ f }: { f: Finding }) {
   );
 }
 
+// The coverage requirements we track and align side-by-side. Order = display order.
+const REQUIREMENTS: { key: string; label: string }[] = [
+  { key: "prior_auth", label: "Prior authorization" },
+  { key: "step_therapy", label: "Step therapy (try & fail first)" },
+  { key: "age_limit", label: "Age restriction" },
+  { key: "specialist", label: "Specialist prescriber" },
+  { key: "quantity", label: "Quantity / dose limit" },
+  { key: "experimental", label: "Some uses experimental / investigational" },
+];
+
 function ComparisonTable({ comparisons }: { comparisons: Comparison[] }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
@@ -219,48 +229,113 @@ function ComparisonTable({ comparisons }: { comparisons: Comparison[] }) {
         <span className="count">{rows.length} topics</span>
       </div>
       <div className="cmp-table">
-        {rows.map((c) => (
-          <div key={c.topic_id} className={`cmp ${openId === c.topic_id ? "open" : ""}`}>
-            <button className="cmp-head" onClick={() => setOpenId(openId === c.topic_id ? null : c.topic_id)}>
-              <span className="cmp-label">{c.label}</span>
-              <span className="cmp-cat">{c.category}</span>
-              <span className="cmp-diffs">
-                {c.diffs.length === 0
-                  ? <span className="agree">criteria aligned</span>
-                  : c.diffs.map((d) => (
-                      <span key={d.key} className={`dtag ${d.only === FL ? "dtag-fl" : "dtag-os"}`}>
-                        {d.label}: {d.only}
-                      </span>
-                    ))}
-              </span>
-              <span className="cmp-caret">{openId === c.topic_id ? "−" : "+"}</span>
-            </button>
-            {openId === c.topic_id && (
-              <div className="cmp-body">
-                {(["bcbsfl", "oscar"] as const).map((src) => {
-                  const side = c[src];
-                  return (
-                    <div key={src} className="cmp-side">
-                      <div className="cmp-sidehead">
-                        <span className={`src-chip ${src === "bcbsfl" ? "src-bcbsfl" : "src-oscar"}`}>
-                          {src === "bcbsfl" ? FL : OS}
-                        </span>
-                        <span className="mono dim">{side.policy_id || "—"}</span>
-                        {side.consolidated_into && (
-                          <span className="consol">via class guideline {side.consolidated_into}</span>
-                        )}
-                      </div>
-                      <Link to={`/policy/${side.id}`} className="cmp-title">{side.title}</Link>
-                      <p className="cmp-excerpt">{side.excerpt || "—"}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
+        {rows.map((c) => {
+          const open = openId === c.topic_id;
+          const n = c.diffs.length;
+          return (
+            <div key={c.topic_id} className={`cmp ${open ? "open" : ""}`}>
+              <button className="cmp-head" onClick={() => setOpenId(open ? null : c.topic_id)}>
+                <span className="cmp-label">{c.label}</span>
+                <span className="cmp-cat">{c.category}</span>
+                <span className={`cmp-status ${n === 0 ? "is-aligned" : "is-diff"}`}>
+                  {n === 0
+                    ? "Criteria aligned"
+                    : `${n} requirement${n === 1 ? "" : "s"} differ`}
+                </span>
+                <span className="cmp-caret">{open ? "−" : "+"}</span>
+              </button>
+              {open && <ComparisonBody c={c} />}
+            </div>
+          );
+        })}
       </div>
     </div>
+  );
+}
+
+function ComparisonBody({ c }: { c: Comparison }) {
+  const flOnly = c.diffs.filter((d) => d.only === FL).map((d) => d.label);
+  const osOnly = c.diffs.filter((d) => d.only === OS).map((d) => d.label);
+
+  return (
+    <div className="cmp-body">
+      {/* What differs — plain-English summary of the mismatched requirements. */}
+      {c.diffs.length === 0 ? (
+        <p className="cmp-verdict aligned">
+          Both payers apply the same set of tracked requirements on this topic. The wording
+          still differs — read the criteria below for specifics.
+        </p>
+      ) : (
+        <div className="cmp-verdict">
+          <p>This is where the two policies diverge:</p>
+          <ul>
+            {osOnly.length > 0 && (
+              <li>
+                <span className="src-chip src-oscar">{OS}</span> additionally requires{" "}
+                <b>{osOnly.join(", ")}</b> — not stated by Florida Blue.
+              </li>
+            )}
+            {flOnly.length > 0 && (
+              <li>
+                <span className="src-chip src-bcbsfl">{FL}</span> additionally requires{" "}
+                <b>{flOnly.join(", ")}</b> — not stated by Oscar.
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* Requirement-by-requirement matrix — the at-a-glance "where do they differ". */}
+      <div className="req-matrix">
+        <div className="req-row req-head">
+          <span className="req-name">Requirement</span>
+          <span className="req-cell"><span className="src-chip src-bcbsfl">{FL}</span></span>
+          <span className="req-cell"><span className="src-chip src-oscar">{OS}</span></span>
+        </div>
+        {REQUIREMENTS.map((r) => {
+          const fl = !!c.bcbsfl.signals[r.key];
+          const os = !!c.oscar.signals[r.key];
+          const diff = fl !== os;
+          return (
+            <div key={r.key} className={`req-row ${diff ? "is-diff" : ""}`}>
+              <span className="req-name">{r.label}</span>
+              <ReqCell on={fl} diff={diff} />
+              <ReqCell on={os} diff={diff} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Full criteria, side by side, so columns line up with the matrix above. */}
+      <div className="cmp-sides">
+        {(["bcbsfl", "oscar"] as const).map((src) => {
+          const side = c[src];
+          return (
+            <div key={src} className="cmp-side">
+              <div className="cmp-sidehead">
+                <span className={`src-chip ${src === "bcbsfl" ? "src-bcbsfl" : "src-oscar"}`}>
+                  {src === "bcbsfl" ? FL : OS}
+                </span>
+                <span className="mono dim">{side.policy_id || "—"}</span>
+                {side.consolidated_into && (
+                  <span className="consol">via class guideline {side.consolidated_into}</span>
+                )}
+              </div>
+              <Link to={`/policy/${side.id}`} className="cmp-title">{side.title}</Link>
+              <p className="cmp-excerpt">{side.excerpt || "—"}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ReqCell({ on, diff }: { on: boolean; diff: boolean }) {
+  return (
+    <span className={`req-cell ${on ? "yes" : "no"} ${diff ? "diff" : ""}`}>
+      {on ? <><span className="req-mark">✓</span> Required</> : <span className="req-dash">— not stated</span>}
+    </span>
   );
 }
 
