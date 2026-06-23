@@ -59,7 +59,9 @@ def run_pull(
         ex = extract_pdf(doc.content)
         rec = {
             "source": entry.source, "doc_key": entry.doc_key,
-            "policy_id": ex.policy_id, "title": entry.title, "subject": ex.subject,
+            # Prefer catalog-supplied identity over PDF-parsed when the adapter set it.
+            "policy_id": entry.policy_id or ex.policy_id, "version": entry.version,
+            "title": entry.title, "subject": ex.subject,
             "file_type": entry.file_type, "source_url": entry.source_url,
             "effective_date": ex.effective_date, "revised_date": ex.revised_date,
             "page_count": ex.page_count, "cpt_codes": ex.cpt_codes,

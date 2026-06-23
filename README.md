@@ -1,11 +1,27 @@
 # policydb
 
-Pull payer **medical coverage policies** into a single queryable SQLite dataset so
-they can be searched and compared across competitors.
+Pull payer **medical & drug coverage policies** into a single queryable SQLite
+dataset, then compare them across competitors — via CLI or a deployable website.
 
-First source: **Blue Cross Blue Shield of Florida** Medical Coverage Guidelines
-(https://mcgs.bcbsfl.com). The design is source-agnostic — each new payer is one
-new *adapter*; extraction, schema, and queries are shared.
+Sources so far:
+- **Blue Cross Blue Shield of Florida** (https://mcgs.bcbsfl.com) — 754 policies
+- **Oscar Health** (https://www.hioscar.com/clinical-guidelines) — medical + pharmacy
+
+The design is source-agnostic — each new payer is one new *adapter*; extraction,
+schema, queries, cross-payer matching, and the website are shared.
+
+## Website
+
+`web/` is a React + Vite app (deploys to **Firebase Hosting**, data shipped as a
+static bundle — no DB billing) that shows **side-by-side comparisons** of equivalent
+policies across payers, plus full-text browse/search. Cross-payer topics are matched
+automatically (`policydb/match.py`). See [`web/README.md`](web/README.md) for build
+and deploy steps.
+
+```bash
+python scripts/export_web.py --db data/policies.db --out web/public/data  # build bundle
+cd web && npm install && npm run dev                                       # preview
+```
 
 ## Layout
 
@@ -13,12 +29,16 @@ new *adapter*; extraction, schema, and queries are shared.
 policydb/
   sources/base.py      SourceAdapter interface (catalog + fetch_document)
   sources/bcbsfl.py    BCBS-FL adapter (see "How BCBS-FL works" below)
-  extract.py           PDF -> text + parsed fields (MCG#, subject, dates, CPT/HCPCS)
-  db.py                SQLite schema + FTS5 full-text index
+  sources/oscar.py     Oscar adapter (Next.js/Contentful; stateless, parallel)
+  extract.py           PDF -> text + parsed fields (policy#, subject, dates, CPT/HCPCS)
+  match.py             cross-payer topic clustering (IDF-cosine over titles)
+  db.py                SQLite schema + FTS5 full-text index (self-migrating)
   pipeline.py          orchestration: catalog -> fetch -> extract -> store
 scripts/
   pull.py              CLI: pull a source into the dataset
   query.py             CLI: stats / search / show / compare
+  export_web.py        build the website's static data bundle
+web/                   React + Vite comparison site (Firebase Hosting)
 data/                  the SQLite dataset lives here (git-ignored)
 ```
 

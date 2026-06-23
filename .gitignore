@@ -13,3 +13,10 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# web app
+web/node_modules/
+web/dist/
+.firebase/
+# generated data bundle (regenerate via scripts/export_web.py)
+web/public/data/

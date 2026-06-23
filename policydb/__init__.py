@@ -12,4 +12,10 @@ def _bcbsfl():
     return BcbsflAdapter()
 
 
+def _oscar():
+    from .sources.oscar import OscarAdapter
+    return OscarAdapter()
+
+
 register("bcbsfl", _bcbsfl)
+register("oscar", _oscar)

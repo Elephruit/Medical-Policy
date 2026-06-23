@@ -26,6 +26,12 @@ class CatalogEntry:
     fetch_ref: str               # opaque token the adapter uses in fetch_document()
     source_url: str              # canonical URL to view the document
     file_type: str               # "pdf", "doc", "form", ...
+    # Optional source-supplied fields. When the catalog already knows these more
+    # authoritatively than PDF parsing would (e.g. Oscar's code/version live in
+    # the listing, not in MCG-style headers), set them and the pipeline prefers
+    # them over the values extracted from the PDF.
+    policy_id: Optional[str] = None
+    version: Optional[str] = None
     extra: dict = field(default_factory=dict)
 
 
