@@ -1,0 +1,167 @@
+[
+ {
+  "id": "specialist",
+  "type": "criteria",
+  "tier": "major",
+  "title": "Oscar gates drugs on prescriber specialty; Florida Blue usually doesn't",
+  "summary": "For specialty drugs, Oscar routinely requires the prescriber to be (or consult) a relevant specialist. Florida Blue's equivalent policies generally omit a specialist requirement, leaning on indication tables and FDA labeling.",
+  "detail": "Across matched drug policies, Oscar's first criterion is almost always \u201cprescribed by or in consultation with\u201d a named specialty \u2014 e.g. dermatologist/allergist for **Dupixent** (Oscar PG026 vs FL 09-J2000-80), ophthalmologist or retinal specialist for **Syfovre** (PG150 vs 09-J4000-47), infectious-disease/heme/transplant specialist for **Livtencity** (PG113 vs 09-J4000-12), and hematologist-oncologist for **Yescarta** (CG063 vs 09-J2000-95). Florida Blue's matching guidelines typically do not state a prescriber-specialty requirement. Net effect: Oscar applies a tighter prescriber gate on the same therapies.",
+  "examples": [
+   {
+    "topic_id": 248,
+    "label": "Dupilumab (Dupixent) Injection"
+   },
+   {
+    "topic_id": 435,
+    "label": "Pegcetacoplan (Syfovre) intravitreal injection"
+   },
+   {
+    "topic_id": 371,
+    "label": "Maribavir (Livtencity).doc"
+   },
+   {
+    "topic_id": 130,
+    "label": "Abrocitinib (Cibinqo) Tablets"
+   }
+  ]
+ },
+ {
+  "id": "age",
+  "type": "criteria",
+  "tier": "major",
+  "title": "Oscar sets explicit age/weight minimums; Florida Blue defers to FDA labeling",
+  "summary": "Oscar's drug criteria commonly hard-code a minimum age (and sometimes weight). Florida Blue more often ties age to \u201cwithin FDA labeling,\u201d leaving it indication-dependent.",
+  "detail": "Oscar states fixed thresholds \u2014 e.g. **\u226512 years** for **Cibinqo** (PG111) and **Livtencity** (PG113, plus **\u226535 kg**), **\u226518 years** for **Syfovre** (PG150) and **Izervay** (PG168), **\u22655 years** for **Benlysta** (PG014). Florida Blue's parallel policies (e.g. abrocitinib 09-J4000-27, dupilumab 09-J2000-80) instead require the member's age to be \u201cwithin FDA labeling for the requested indication,\u201d or allow prescriber justification. Reviewers comparing eligibility for a specific patient should expect age to be a frequent point of divergence (46 of 99 matched topics show an age-criterion difference in the automated scan).",
+  "examples": [
+   {
+    "topic_id": 130,
+    "label": "Abrocitinib (Cibinqo) Tablets"
+   },
+   {
+    "topic_id": 371,
+    "label": "Maribavir (Livtencity).doc"
+   },
+   {
+    "topic_id": 435,
+    "label": "Pegcetacoplan (Syfovre) intravitreal injection"
+   },
+   {
+    "topic_id": 166,
+    "label": "Belimumab (Benlysta) Injection"
+   }
+  ]
+ },
+ {
+  "id": "step",
+  "type": "criteria",
+  "tier": "major",
+  "title": "Step therapy is codified differently",
+  "summary": "Oscar frequently requires a documented trial-and-failure of specific prior therapies; Florida Blue's structure centers on continuation-of-therapy and discloses Florida's step-therapy exception law.",
+  "detail": "For **Cibinqo** (atopic dermatitis), Oscar PG111 requires the member to have \u201cadequately tried and failed TWO of\u201d named therapies for \u2265 8 weeks each in the past year; Florida Blue 09-J4000-27 instead builds its first criterion around recent prior use of the drug itself and indication-specific tables. Florida Blue policies also reference **Florida law 627.42393**, under which members/providers can request a step-therapy exception \u2014 a state-specific process Oscar's guidelines don't mention. 32 of 99 matched topics show a step-therapy difference in the automated scan.",
+  "examples": [
+   {
+    "topic_id": 130,
+    "label": "Abrocitinib (Cibinqo) Tablets"
+   },
+   {
+    "topic_id": 248,
+    "label": "Dupilumab (Dupixent) Injection"
+   },
+   {
+    "topic_id": 192,
+    "label": "Budesonide"
+   }
+  ]
+ },
+ {
+  "id": "siteofcare",
+  "type": "criteria",
+  "tier": "notable",
+  "title": "Florida Blue restricts site of care toward self-administration",
+  "summary": "Several Florida Blue drug policies declare that provider-administered (office/outpatient) administration is \u201cnot medically necessary\u201d for self-injectable products \u2014 a site-of-care limit Oscar's matching policies don't emphasize.",
+  "detail": "Florida Blue 09-J1000-35 states that administration of subcutaneous **belimumab (Benlysta)** and **voclosporin (Lupkynis)** \u201cin a provider-administered setting such as an outpatient hospital, ambulatory surgical suite, physician office, or emergency facility is not considered medically necessary.\u201d This pushes members to self-administration/specialty pharmacy. Oscar's Benlysta guideline (PG014) focuses on clinical eligibility without the equivalent site-of-care exclusion.",
+  "examples": [
+   {
+    "topic_id": 166,
+    "label": "Belimumab (Benlysta) Injection"
+   }
+  ]
+ },
+ {
+  "id": "organization",
+  "type": "organization",
+  "tier": "major",
+  "title": "Opposite consolidation strategies \u2014 and Oscar delegates some domains",
+  "summary": "Florida Blue consolidates drug classes into combined guidelines; Oscar keeps one guideline per drug but bundles some medical/biologic classes \u2014 and routes domains like advanced imaging to eviCore.",
+  "detail": "Florida Blue folds many individual drugs into class guidelines \u2014 e.g. **Multiple Sclerosis: Oral and Self Injectable Therapy (09-J5000-44)** covers Mavenclad, Ponvory, Gilenya, Aubagio, Ofatumumab and Mayzent; CAR-T agents collapse into 09-J3000-94. Oscar keeps these as separate per-drug guidelines (PG227, PG230, \u2026). Conversely, Oscar publishes class-level **medical** guidelines (e.g. *Biologics for Chronic Respiratory* CG100, *HER2-Targeted Agents* CG101) where Florida Blue has per-drug policies, and Oscar's clinical-guidelines page **delegates advanced imaging/radiology to eviCore**. This is the single biggest reason the catalogs look different (754 vs 387 guidelines) and why many \u201cgaps\u201d are organizational, not coverage gaps.",
+  "examples": [
+   {
+    "topic_id": 210,
+    "label": "Cladribine (Mavenclad) tablets"
+   },
+   {
+    "topic_id": 453,
+    "label": "Ponesimod (Ponvory) Tablet"
+   },
+   {
+    "topic_id": 408,
+    "label": "Ofatumumab"
+   }
+  ]
+ },
+ {
+  "id": "sma",
+  "type": "criteria",
+  "tier": "notable",
+  "title": "SMA gene therapy (Zolgensma): different eligibility ceilings",
+  "summary": "Both require genetic confirmation, but Oscar caps eligibility at age <2 and disease onset before 6 months, while Florida Blue instead leans on SMN2 copy number, anti-AAV9 antibody titer and ventilation status.",
+  "detail": "Oscar CG061 requires age **< 2 years** at treatment, symptom **onset before 6 months**, a neurologist/neuromuscular prescriber, and **1\u20133 SMN2 copies**. Florida Blue 09-J3000-30 requires **\u2264 4 SMN2 copies**, a pre-treatment **anti-AAV9 titer \u2264 1:50**, liver assessment/monitoring, and that the member is **not invasive-ventilation dependent** \u2014 without the explicit age-<2/onset-<6-months ceiling. The same therapy, two materially different eligibility envelopes.",
+  "examples": [
+   {
+    "topic_id": 415,
+    "label": "Onasemnogene abeparvovec"
+   }
+  ]
+ },
+ {
+  "id": "bariatric",
+  "type": "criteria",
+  "tier": "notable",
+  "title": "Bariatric surgery: Oscar maintains a dedicated adolescent policy",
+  "summary": "Oscar splits bariatric surgery into adult (CG008) and adolescent (CG009) guidelines with pediatric BMI-percentile criteria; Florida Blue addresses it within a single policy.",
+  "detail": "Oscar CG009 sets adolescent-specific criteria \u2014 age **13\u201317 with physical maturity (\u226595% predicted adult stature by bone age)**, **BMI \u226540 (or \u2265140% of the 95th percentile)**, or **BMI \u226535 with a qualifying comorbidity** (T2DM, moderate-severe OSA, pseudotumor cerebri, severe NASH). Florida Blue 02-40000-10 handles bariatric surgery (including revision and balloon devices, several marked investigational) without a separate adolescent track in the matched policy.",
+  "examples": [
+   {
+    "topic_id": 645,
+    "label": "Bariatric Surgery"
+   }
+  ]
+ },
+ {
+  "id": "agreement",
+  "type": "agreement",
+  "tier": "notable",
+  "title": "Strong convergence on objective-threshold topics",
+  "summary": "Where coverage hinges on objective lab/imaging thresholds, the two payers largely agree \u2014 home oxygen and major-joint arthroplasty are near-identical.",
+  "detail": "**Home oxygen** \u2014 both adopt the classic thresholds: PaO2 \u2264 55 mmHg / SpO2 \u2264 88%, or 56\u201359 mmHg / 89% with cor pulmonale, edema or polycythemia (FL 09-E0400-00 vs Oscar CG005). **Hip arthroplasty** \u2014 both require advanced joint destruction (**Kellgren-Lawrence grade III/IV**) plus persistent pain and \u2265 3 months of failed conservative care (FL 02-20000-65 vs Oscar CG070). On these, a denial under one payer would likely be a denial under the other.",
+  "examples": [
+   {
+    "topic_id": 27,
+    "label": "Oxygen"
+   },
+   {
+    "topic_id": 675,
+    "label": "Hip Arthroplasty"
+   }
+  ]
+ },
+ {
+  "id": "gaps",
+  "type": "gap",
+  "tier": "major",
+  "title": "Catalog scope: 99 overlapping topics, hundreds unique \u2014 mostly structural",
+  "summary": "Florida Blue publishes far more individual guidelines (754 vs 387). Of these, 99 topics match across payers; 647 are Florida-Blue-only and 208 Oscar-only \u2014 but most \u201conly\u201d topics reflect granularity, class-bundling or vendor delegation, not proven non-coverage.",
+  "detail": "Florida-Blue-only topics are dominated by **Pharmacy (382)**, **Surgery (94)** and **Radiology (57)** \u2014 areas where FL writes per-drug and per-imaging-study guidelines that Oscar either bundles or delegates (Oscar routes advanced imaging to eviCore). Oscar-only topics include dedicated guidelines for areas like **Hearing Aids & Implants (CG001)**, **Home Births & Birth Centers (CG038)**, **Erectile Dysfunction (CG037)**, **Acupuncture (CG013)** and **Enteral/Oral Nutrition (CG011)**. Treat these lists as \u201cwho publishes a dedicated guideline,\u201d not a definitive coverage yes/no \u2014 absence of a standalone guideline can mean coverage is handled under a broader policy, a delegated vendor, or plan documents.",
+  "examples": []
+ }
+]

@@ -38,3 +38,61 @@ export interface Meta {
   cross_payer_topics: number;
   sources: { slug: string; label: string; count: number }[];
 }
+
+export interface Side {
+  id: string;
+  policy_id: string | null;
+  title: string;
+  version: string | null;
+  effective_date: string | null;
+  revised_date: string | null;
+  page_count: number | null;
+  signals: Record<string, boolean>;
+  excerpt: string;
+  consolidated_into: string | null;
+}
+
+export interface Comparison {
+  topic_id: number;
+  label: string;
+  score: number;
+  category: string;
+  bcbsfl: Side;
+  oscar: Side;
+  diffs: { key: string; label: string; only: string }[];
+}
+
+export interface Finding {
+  id: string;
+  type: "criteria" | "organization" | "gap" | "agreement";
+  tier: "major" | "notable";
+  title: string;
+  summary: string;
+  detail: string;
+  examples: { topic_id: number; label: string }[];
+}
+
+export interface GapItem {
+  topic_id: number;
+  label: string;
+  policy_id: string | null;
+  category: string;
+}
+
+export interface Analysis {
+  summary: {
+    total_policies: number;
+    by_source: Record<string, number>;
+    cross_payer_topics: number;
+    bcbsfl_only: number;
+    oscar_only: number;
+    topics_with_diffs: number;
+    diff_type_counts: Record<string, number>;
+    bcbsfl_gap_categories: Record<string, number>;
+    oscar_gap_categories: Record<string, number>;
+    source_labels: Record<string, string>;
+  };
+  findings: Finding[];
+  comparisons: Comparison[];
+  gaps: { bcbsfl: GapItem[]; oscar: GapItem[] };
+}

@@ -5,6 +5,7 @@ import Compare from "./pages/Compare";
 import Topic from "./pages/Topic";
 import Browse from "./pages/Browse";
 import Policy from "./pages/Policy";
+import AnalysisPage from "./pages/Analysis";
 
 export default function App() {
   const [data, setData] = useState<Dataset | null>(null);
@@ -25,6 +26,7 @@ export default function App() {
         </Link>
         <nav>
           <NavLink to="/" end>Compare</NavLink>
+          <NavLink to="/report">Report</NavLink>
           <NavLink to="/browse">Browse</NavLink>
         </nav>
         <div className="stats">
@@ -35,6 +37,7 @@ export default function App() {
       <main className="content">
         <Routes>
           <Route path="/" element={<Compare />} />
+          <Route path="/report" element={<AnalysisPage />} />
           <Route path="/topic/:id" element={<Topic />} />
           <Route path="/browse" element={<Browse />} />
           <Route path="/policy/:id" element={<Policy />} />

@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import MiniSearch from "minisearch";
-import type { Meta, Policy, PolicyText, Topic } from "./types";
+import type { Analysis, Meta, Policy, PolicyText, Topic } from "./types";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -46,6 +46,16 @@ export function loadText(id: string): Promise<PolicyText> {
     );
   }
   return textCache.get(id)!;
+}
+
+let analysisPromise: Promise<Analysis> | null = null;
+export function loadAnalysis(): Promise<Analysis> {
+  if (!analysisPromise) {
+    analysisPromise = fetch(`${BASE}data/analysis.json`).then(
+      (r) => r.json() as Promise<Analysis>
+    );
+  }
+  return analysisPromise;
 }
 
 export const DataContext = createContext<Dataset | null>(null);
