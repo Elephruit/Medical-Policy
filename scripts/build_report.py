@@ -106,7 +106,21 @@ def build():
                 + sum(1 for x in lst(l, "shared") if x.get("agreement") == "differs"))
     divergent = sorted(llm, key=dc, reverse=True)[:6]
 
-    logo = base64.b64encode((OUT / "elephruit-logo.png").read_bytes()).decode()
+    flow = (
+        '<div class="flow">'
+        '<div class="fstage"><span class="fn">1</span><b>Acquire</b><small>scrape policy PDFs</small></div>'
+        '<div class="fsep">&rarr;</div>'
+        '<div class="fstage"><span class="fn">2</span><b>Extract</b><small>PDF &rarr; text + fields</small></div>'
+        '<div class="fsep">&rarr;</div>'
+        '<div class="fstage llm"><span class="fn">3</span><b>Normalize</b><small>LLM · canonical subject</small></div>'
+        '<div class="fsep">&rarr;</div>'
+        '<div class="fstage"><span class="fn">4</span><b>Match</b><small>lexical + LLM links</small></div>'
+        '<div class="fsep">&rarr;</div>'
+        '<div class="fstage llm"><span class="fn">5</span><b>Compare</b><small>LLM · criteria + restrictiveness</small></div>'
+        '<div class="fsep">&rarr;</div>'
+        '<div class="fstage"><span class="fn">6</span><b>Serve</b><small>site + this report</small></div>'
+        '</div>'
+    )
     fl_pol = s["by_source"].get("bcbsfl", 0)
     os_pol = s["by_source"].get("oscar", 0)
     fams = meta.get("drug_families", 0)
@@ -214,8 +228,10 @@ p {{ margin: 0; }}
 .dim {{ color: #6b7686; }}
 
 .cover {{ display: flex; flex-direction: column; min-height: 247mm; }}
-.cover-top {{ border-bottom: 3px solid {BRAND}; padding-bottom: 18px; }}
-.logo {{ height: 52px; }}
+.cover-top {{ border-bottom: 3px solid {BRAND}; padding-bottom: 16px; display: flex; align-items: baseline; gap: 12px; }}
+.wordmark {{ font-size: 18pt; font-weight: 800; letter-spacing: -0.4px; color: {BRAND_DK}; }}
+.wordmark span {{ color: #14202e; font-weight: 600; }}
+.wordmark-sub {{ font-size: 9.5pt; color: #6b7686; }}
 .cover-mid {{ margin-top: auto; margin-bottom: auto; }}
 .eyebrow {{ color: {BRAND_DK}; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; font-size: 10pt; }}
 .title {{ font-size: 32pt; line-height: 1.12; margin: 14px 0 10px; font-weight: 800; }}
@@ -267,11 +283,23 @@ p {{ margin: 0; }}
 .cf h4 {{ font-size: 10.5pt; margin-bottom: 3px; }}
 .cf p {{ font-size: 9.5pt; color: #44525f; }}
 
-.method {{ background: #f6fbfe; border: 1px solid #d6ecf8; border-radius: 12px; padding: 16px 18px; font-size: 10pt; color: #2a3744; line-height: 1.6; }}
-.method b {{ color: {BRAND_DK}; }}
-.pipe {{ font-family: ui-monospace, Menlo, monospace; font-size: 8.5pt; color: #44525f; background: #fff; border: 1px solid #d6ecf8; border-radius: 8px; padding: 10px 12px; margin-top: 10px; white-space: pre; overflow-x: auto; }}
+.method-lede {{ font-size: 10pt; color: #44525f; line-height: 1.6; max-width: 168mm; margin: 0 0 16px; }}
+.method-lede b {{ color: {BRAND_DK}; }}
 
-.appx {{ break-before: page; }}
+/* pretty pipeline diagram */
+.flow {{ display: flex; align-items: stretch; flex-wrap: wrap; gap: 0; margin: 4px 0 22px; break-inside: avoid; }}
+.fstage {{ flex: 1; min-width: 74px; background: #fff; border: 1px solid #dce3ea; border-radius: 10px;
+  padding: 10px 8px 9px; text-align: center; position: relative; }}
+.fstage .fn {{ display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  background: #eef1f5; color: #6b7686; font-size: 8pt; font-weight: 800; margin-bottom: 5px; }}
+.fstage b {{ display: block; font-size: 10pt; letter-spacing: -.2px; }}
+.fstage small {{ display: block; color: #6b7686; font-size: 7.5pt; line-height: 1.25; margin-top: 2px; }}
+.fstage.llm {{ border-color: {BRAND}; background: #f3fbfe; }}
+.fstage.llm .fn {{ background: {BRAND}; color: #fff; }}
+.fstage.llm b {{ color: {BRAND_DK}; }}
+.fstage.llm small {{ color: {BRAND_DK}; }}
+.fsep {{ display: flex; align-items: center; color: #c4ccd5; font-size: 13pt; padding: 0 3px; }}
+
 .stage {{ display: grid; grid-template-columns: 26px 1fr; gap: 12px; margin: 0 0 13px; break-inside: avoid; }}
 .stage-n {{ font-size: 12pt; font-weight: 800; color: {BRAND}; }}
 .stage h4 {{ font-size: 11pt; margin-bottom: 3px; }}
@@ -287,7 +315,10 @@ p {{ margin: 0; }}
 </style></head><body>
 
 <div class="cover">
-  <div class="cover-top"><img class="logo" src="data:image/png;base64,{logo}" alt="Elephruit"></div>
+  <div class="cover-top">
+    <span class="wordmark">Mike Zehrer</span>
+    <span class="wordmark-sub">Payer Policy Intelligence</span>
+  </div>
   <div class="cover-mid">
     <div class="eyebrow">Competitive Coverage Analysis</div>
     <div class="title">Florida Blue <span class="vs">vs.</span> Oscar Health<br>Medical &amp; Drug Coverage Policies</div>
@@ -299,7 +330,7 @@ p {{ margin: 0; }}
       Source &amp; methodology: <a href="{REPO}">{REPO.replace('https://','')}</a></div>
   </div>
   <div class="cover-bot">
-    <span>Elephruit · Payer Policy Intelligence</span>
+    <span>Analysis &amp; engineering by {AUTHOR}</span>
     <span>{fl_pol:,} Florida Blue · {os_pol:,} Oscar policies analyzed</span>
   </div>
 </div>
@@ -318,26 +349,15 @@ p {{ margin: 0; }}
 <div class="sec-h">Findings from reading the policies</div>
 <div class="cfgrid">{cur_html}</div>
 
-<div class="sec-h">How this was built</div>
-<div class="method">
-  Every policy was scraped from each payer's public clinical-guideline site, parsed from PDF to text,
-  then <b>normalized by an LLM</b> into a canonical subject so the same drug or service matches across
-  payers even when document titles differ. Overlapping topics were then <b>aligned and scored for
-  restrictiveness by an LLM</b> reading both policies' coverage criteria. Restrictiveness is a
-  decision-support signal, not ground truth — every claim links back to the source criteria on the
-  interactive site. A two-tier model strategy (a fast model for the {s['total_policies']:,} per-policy
-  normalizations, a stronger model for the nuanced comparisons) keeps the whole enrichment a bounded,
-  cached, reproducible cost.
-  <div class="pipe">scrape → extract (PDF→text) → LLM normalize (canonical subject) → match
-       → LLM compare + restrictiveness score → static site + this report</div>
-</div>
+<div class="sec-h">Methodology &amp; technical flow</div>
+<p class="method-lede">
+  Every policy is scraped, parsed, and <b>normalized by an LLM</b> into a canonical subject so the
+  same drug or service matches across payers even when titles differ; overlapping topics are then
+  <b>aligned and scored for restrictiveness by an LLM</b> reading both policies' criteria. Each stage
+  is a separate, re-runnable command, and every LLM call is cached by content hash — so the analysis
+  is incremental and reproducible. Full source: <b>{REPO.replace('https://','')}</b>.</p>
 
-<div class="appx">
-<div class="sec-h">Appendix · Methodology &amp; technical flow</div>
-<p class="section-sub" style="color:#44525f;font-size:10pt;margin-bottom:18px;max-width:165mm">
-  The full pipeline is open source at <b style="color:{BRAND_DK}">{REPO.replace('https://','')}</b>.
-  Each stage is a separate, re-runnable command; every LLM call is cached on disk by a content hash,
-  so the analysis is incremental and reproducible.</p>
+{flow}
 
 <div class="stage"><div class="stage-n">1</div><div>
   <h4>Acquire</h4><p>A per-payer <code>SourceAdapter</code> yields a catalog and fetches each policy
@@ -384,10 +404,9 @@ p {{ margin: 0; }}
   <div class="p"><h5>Decision support, not ground truth</h5><p>Restrictiveness is an LLM judgment over
     PDF-extracted text; every claim links back to the source criteria on the interactive site.</p></div>
 </div>
-</div>
 
 <div class="foot">
-  <span>© {date.today().year} {AUTHOR} · Built with the Elephruit policy-intelligence pipeline</span>
+  <span>© {date.today().year} {AUTHOR} · Payer Policy Intelligence</span>
   <span><a href="{REPO}">{REPO.replace('https://','')}</a></span>
 </div>
 

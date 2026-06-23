@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="report/elephruit-logo.png" alt="Elephruit" height="58">
-
 <h1>Payer Coverage Policy Intelligence</h1>
 
 <p><b>Scrape, normalize, and LLM-compare U.S. health-insurer coverage policies — then ship it as an interactive site and a branded findings report.</b></p>
+
+<p><i>Designed, built &amp; analyzed by <b>Mike Zehrer</b></i></p>
 
 <p>
 <a href="https://payer-policy-cmp-06222027.web.app"><img src="https://img.shields.io/badge/%E2%96%B6_Live_demo-Florida_Blue_vs_Oscar-1f9bd6?style=for-the-badge" alt="Live demo"></a>
@@ -41,21 +41,13 @@ comparison, the website, and the report are shared.
 
 ## How it works (end-to-end flow)
 
-```
-                pull            extract           export_web
-  payer sites ───────▶ SQLite ───────▶ text+fields ───────▶ static JSON bundle ──▶ website
-   (adapters)          policies.db                              ▲   ▲
-                                                                │   │
-                          llm_normalize ──▶ llm_profiles.json ──┘   │  (force-merge same-subject
-                          (1 call/policy)    llm_links.json ────────┘   pairs the title matcher missed)
-                                                                    │
-                              analyze --llm ──▶ analysis.json ──────┘
-                          (1 call/cross-payer topic: aligned
-                           criteria + restrictiveness verdict)
-```
+<p align="center"><img src="docs/pipeline.png" width="900" alt="Pipeline: Acquire → Extract → Normalize (LLM) → Match → Compare (LLM) → Serve"></p>
 
-Each stage is a separate, re-runnable command. LLM calls are **cached on disk by
-content hash**, so re-running is incremental and free unless inputs change.
+Each stage is a separate, re-runnable command. The two **LLM** stages (normalize, compare) are
+cached on disk by content hash, so re-running is incremental and free unless inputs change. Behind
+the scenes the bundle is assembled by `pull` → `extract` → `export_web` (with `llm_normalize`'s
+same-subject links force-merged into matching) and `analyze --llm` (aligned criteria +
+restrictiveness verdict per topic).
 
 ### 1. Acquire — `scripts/pull.py` → `policydb/pipeline.py`
 Each payer has a `SourceAdapter` (`policydb/sources/`) that yields a catalog of
