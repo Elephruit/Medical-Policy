@@ -2,10 +2,68 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadAnalysis, loadDrugFamilies } from "../data";
 import type { Analysis, Comparison, DrugFamily, Finding } from "../types";
-import { ComparisonView, diffCount } from "../components/Comparison";
+import { ComparisonView, RestrictivenessChip, diffCount } from "../components/Comparison";
 
 const FL = "Florida Blue";
 const OS = "Oscar";
+
+interface Tally { label: string; n: number; }
+interface Insights {
+  scored: number;
+  oscarAdds: Tally[];
+  flAdds: Tally[];
+  divergent: { c: Comparison; n: number }[];
+}
+
+// The LLM writes free-text category labels, so the same concept fragments
+// ("specialist prescriber" / "…requirement" / "…gate"). Bucket them into a
+// canonical vocabulary so the leaderboard reads cleanly. Order = priority.
+const CANON: [RegExp, string][] = [
+  [/specialist|ologist|prescriber/, "Specialist prescriber"],
+  [/\bage\b|months of age|years of age/, "Age restriction"],
+  [/step therapy|tried|failed|trial of|prior therap|inadequate/, "Step therapy"],
+  [/continuation|continued|reauth|re-auth/, "Continuation-of-therapy rules"],
+  [/duration|approval period|approval length|authorization period/, "Approval duration limit"],
+  [/prior authorization|prior auth|preauth/, "Prior authorization"],
+  [/genetic|mutation|biomarker|allele/, "Genetic / biomarker testing"],
+  [/diagnos/, "Diagnosis confirmation"],
+  [/dose|dosing|quantity|weight|bsa|body surface/, "Dose / quantity limit"],
+  [/document|chart|medical record|labor/, "Documentation"],
+  [/experimental|investigational|not medically|exclus|non-covered/, "Exclusions / non-covered uses"],
+  [/lab|test|titer|level|screen/, "Lab / testing requirement"],
+];
+function canonCategory(raw: string): string {
+  const s = (raw || "").trim().toLowerCase();
+  for (const [re, label] of CANON) if (re.test(s)) return label;
+  // Fallback: title-case the raw label.
+  return raw.trim().replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function computeInsights(cmps: Comparison[]): Insights {
+  const withLlm = cmps.filter((c) => c.llm);
+  const tally = (pick: (l: NonNullable<Comparison["llm"]>) => { category: string }[]): Tally[] => {
+    const m = new Map<string, Tally>();
+    for (const c of withLlm) {
+      for (const it of pick(c.llm!)) {
+        if (!(it.category || "").trim()) continue;
+        const label = canonCategory(it.category);
+        const e = m.get(label) || { label, n: 0 };
+        e.n++;
+        m.set(label, e);
+      }
+    }
+    return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 8);
+  };
+  return {
+    scored: withLlm.length,
+    oscarAdds: tally((l) => l.oscar_only),
+    flAdds: tally((l) => l.florida_blue_only),
+    divergent: withLlm
+      .map((c) => ({ c, n: diffCount(c) }))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 12),
+  };
+}
 
 export default function AnalysisPage() {
   const [a, setA] = useState<Analysis | null>(null);
@@ -14,40 +72,51 @@ export default function AnalysisPage() {
   }, []);
   if (!a) return <div className="loading">Running the analysis…</div>;
   const s = a.summary;
+  const ins = computeInsights(a.comparisons);
+  const r = s.restrictiveness;
 
   return (
     <div className="report">
       <div className="report-hero">
-        <h1>Coverage Comparison: Florida Blue vs. Oscar Health</h1>
+        <span className="report-kicker">AI-read coverage comparison · {ins.scored} drugs &amp; services</span>
+        <h1>Florida Blue vs. Oscar Health</h1>
         <p className="report-lede">
-          A side-by-side analysis of {s.total_policies.toLocaleString()} medical &amp;
-          drug coverage policies — where the two payers agree, where their coverage
-          criteria diverge, and where only one publishes a policy.
+          Every overlapping policy, read by an LLM and aligned criterion-by-criterion —
+          surfacing where the two payers agree, where their requirements diverge, and
+          <strong> which payer runs the tighter coverage criteria</strong>.
         </p>
+
+        {r && r.scored > 0 && <HeadlineVerdict r={r} />}
+
         <div className="kpi-row">
           <Kpi n={s.cross_payer_topics} label="overlapping topics" sub="matched across both payers" />
-          <Kpi n={s.topics_with_diffs} label="show criteria differences" sub="of the overlapping topics" accent />
+          <Kpi n={(s.llm_matched_topics ?? 0)} label="found by AI matching" sub="missed by title matching" accent />
           <Kpi n={s.bcbsfl_only} label="Florida Blue only" sub="dedicated guideline" cls="src-bcbsfl-text" />
           <Kpi n={s.oscar_only} label="Oscar only" sub="dedicated guideline" cls="src-oscar-text" />
         </div>
-        <p className="hero-foot">
-          Plus <strong>{(s as any).drug_family_links ?? ""}</strong> Florida Blue per-drug policies
-          that map to <strong>{(s as any).drug_families ?? ""}</strong> consolidated Oscar drug-class
-          guidelines — see “Drug families” below.</p>
       </div>
 
-      <Section title="How to read this" subtle>
-        <p className="note">
-          Policies were scraped from each payer's public clinical-guideline site and
-          matched into topics automatically by title/text similarity. <strong>Coverage-criteria
-          excerpts and difference tags are extracted programmatically</strong> (Florida Blue's
-          consolidated drug policies are followed to their parent class guideline); the{" "}
-          <strong>Key Findings below were written after reading the matched policies</strong>.
-          “Only one payer” counts reflect <em>who publishes a dedicated guideline</em> — not a
-          definitive coverage yes/no, since a payer may handle a service under a broader policy,
-          delegate it to a vendor (Oscar routes advanced imaging to eviCore), or address it in plan
-          documents.
-        </p>
+      <Section title="What each payer demands on top"
+        subtitle="Across AI-compared topics, the requirement types one payer imposes that the other doesn't — counted from the per-topic “only this payer requires” lists. This is the systematic shape of each payer's tighter posture.">
+        <div className="lb-pair">
+          <AddLeaderboard title={OS} cls="src-oscar" items={ins.oscarAdds} />
+          <AddLeaderboard title={FL} cls="src-bcbsfl" items={ins.flAdds} />
+        </div>
+      </Section>
+
+      <Section title="Biggest divergences"
+        subtitle="The topics where the two payers' criteria differ most — the places worth a human look first. Click through for the full side-by-side.">
+        <div className="diverge-grid">
+          {ins.divergent.map(({ c, n }) => (
+            <Link key={c.topic_id} to={`/topic/${c.topic_id}`} className="diverge-card">
+              <span className="diverge-label">{c.label}</span>
+              <div className="diverge-foot">
+                <span className="diverge-n">{n} differences</span>
+                <RestrictivenessChip c={c} />
+              </div>
+            </Link>
+          ))}
+        </div>
       </Section>
 
       <Section title="Key findings">
@@ -59,7 +128,7 @@ export default function AnalysisPage() {
       </Section>
 
       <Section title="What drives the differences"
-        subtitle="Across the 99 overlapping topics, how often each requirement appears on one payer but not the other (automated scan).">
+        subtitle={`Across the ${s.cross_payer_topics} overlapping topics, how often each requirement appears on one payer but not the other (automated regex scan).`}>
         <div className="diffbars">
           {Object.entries(s.diff_type_counts).map(([label, n]) => (
             <div className="diffbar" key={label}>
@@ -73,15 +142,8 @@ export default function AnalysisPage() {
         </div>
       </Section>
 
-      {s.restrictiveness && s.restrictiveness.scored > 0 && (
-        <Section title="Who runs tighter criteria"
-          subtitle="Across topics with an AI-read comparison, which payer is harder to get approved under. Tighter criteria likely lower utilization and cost for that payer — but can drive member and provider abrasion, so weigh against the actual cost of each service.">
-          <Restrictiveness r={s.restrictiveness} labels={s.source_labels} />
-        </Section>
-      )}
-
-      <Section title="Topic-by-topic comparison"
-        subtitle="Every overlapping topic with its extracted coverage criteria. Open one to read both side by side.">
+      <Section title="Every topic, side by side"
+        subtitle="All overlapping topics with the AI-aligned criteria comparison. Open one to read the summary, restrictiveness verdict, and matched criteria.">
         <ComparisonTable comparisons={a.comparisons} />
       </Section>
 
@@ -91,9 +153,85 @@ export default function AnalysisPage() {
       </Section>
 
       <Section title="Coverage gaps"
-        subtitle="Topics where only one payer publishes a dedicated guideline (see caveat above).">
+        subtitle="Topics where only one payer publishes a dedicated guideline (see method note below).">
         <GapColumns a={a} />
       </Section>
+
+      <Section title="How this was built" subtle>
+        <p className="note">
+          Policies were scraped from each payer's public clinical-guideline site, then
+          <strong> every policy was normalized by an LLM</strong> into a canonical subject so the
+          same drug/service matches across payers even when titles differ
+          (<strong>{s.llm_matched_topics ?? 0}</strong> of these matches were found only this way).
+          Each overlapping topic's criteria are then <strong>aligned and scored for restrictiveness
+          by an LLM</strong> reading both policies' coverage text. Restrictiveness is a
+          decision-support signal, not ground truth — the source criteria are one click away on
+          every comparison. “Only one payer” counts reflect <em>who publishes a dedicated
+          guideline</em>, not a definitive coverage yes/no (a payer may cover a service under a
+          broader policy or delegate it to a vendor — e.g. Oscar routes advanced imaging to eviCore).
+        </p>
+      </Section>
+    </div>
+  );
+}
+
+// Headline: the single biggest takeaway, as a stat + diverging bar.
+function HeadlineVerdict({ r }: { r: NonNullable<Analysis["summary"]["restrictiveness"]> }) {
+  const os = r.by_payer[OS] || 0;
+  const fl = r.by_payer[FL] || 0;
+  const even = r.by_payer["neither"] || 0;
+  const total = os + fl + even || 1;
+  const leader = os >= fl ? OS : FL;
+  const leadN = Math.max(os, fl);
+  const pct = Math.round((leadN / total) * 100);
+  const leadCls = leader === OS ? "src-oscar-text" : "src-bcbsfl-text";
+  return (
+    <div className="verdict">
+      <div className="verdict-stat">
+        <span className={`verdict-pct ${leadCls}`}>{pct}%</span>
+        <span className="verdict-text">
+          of compared topics, <b className={leadCls}>{leader}</b> runs the tighter
+          coverage criteria <span className="dim">({leadN} of {total})</span>
+        </span>
+      </div>
+      <div className="battle">
+        <span className="battle-seg os" style={{ width: `${(os / total) * 100}%` }} />
+        <span className="battle-seg even" style={{ width: `${(even / total) * 100}%` }} />
+        <span className="battle-seg fl" style={{ width: `${(fl / total) * 100}%` }} />
+      </div>
+      <div className="battle-legend">
+        <span><i className="dot src-oscar" /> Oscar tighter <b>{os}</b>
+          {r.substantial[OS] ? <span className="dim"> ({r.substantial[OS]} substantial)</span> : null}</span>
+        <span><i className="dot src-other" /> comparable <b>{even}</b></span>
+        <span><i className="dot src-bcbsfl" /> Florida Blue tighter <b>{fl}</b>
+          {r.substantial[FL] ? <span className="dim"> ({r.substantial[FL]} substantial)</span> : null}</span>
+      </div>
+    </div>
+  );
+}
+
+function AddLeaderboard({ title, cls, items }: { title: string; cls: string; items: Tally[] }) {
+  const max = Math.max(...items.map((i) => i.n), 1);
+  return (
+    <div className="lb">
+      <div className="lb-head">
+        <span className={`src-chip ${cls}`}>{title}</span> most often adds…
+      </div>
+      {items.length === 0 ? (
+        <p className="solo-empty">No extra requirements recorded.</p>
+      ) : (
+        <div className="lb-rows">
+          {items.map((it) => (
+            <div className="lb-row" key={it.label}>
+              <span className="lb-label" title={it.label}>{it.label}</span>
+              <span className="lb-track">
+                <span className={`lb-fill ${cls}`} style={{ width: `${(it.n / max) * 100}%` }} />
+              </span>
+              <span className="lb-n">{it.n}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -282,47 +420,6 @@ function GapColumns({ a }: { a: Analysis }) {
           </div>
         )
       )}
-    </div>
-  );
-}
-
-function Restrictiveness({
-  r, labels,
-}: {
-  r: { scored: number; by_payer: Record<string, number>; substantial: Record<string, number> };
-  labels: Record<string, string>;
-}) {
-  void labels;
-  const fl = r.by_payer[FL] || 0;
-  const os = r.by_payer[OS] || 0;
-  const even = r.by_payer["neither"] || 0;
-  const max = Math.max(fl, os, even, 1);
-  const rows: { name: string; cls: string; n: number; sub?: number }[] = [
-    { name: `${FL} tighter`, cls: "src-bcbsfl", n: fl, sub: r.substantial[FL] || 0 },
-    { name: `${OS} tighter`, cls: "src-oscar", n: os, sub: r.substantial[OS] || 0 },
-    { name: "Comparable", cls: "src-other", n: even },
-  ];
-  return (
-    <div className="restr-roll">
-      <p className="restr-roll-lede">
-        Of <b>{r.scored}</b> AI-compared topics:
-      </p>
-      <div className="restr-bars">
-        {rows.map((row) => (
-          <div className="restr-bar" key={row.name}>
-            <span className="restr-bar-label">
-              <span className={`dot ${row.cls}`} /> {row.name}
-            </span>
-            <span className="restr-bar-track">
-              <span className="restr-bar-fill" style={{ width: `${(row.n / max) * 100}%` }} />
-            </span>
-            <span className="restr-bar-n">
-              {row.n}
-              {row.sub ? <span className="restr-bar-sub"> · {row.sub} substantial</span> : null}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

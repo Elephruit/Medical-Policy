@@ -154,8 +154,49 @@ a { color: inherit; text-decoration: none; }
 /* ===== Report / Analysis page ===== */
 .report { max-width: 1000px; margin: 0 auto; }
 .report-hero { padding: 8px 0 24px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
-.report-hero h1 { font-size: 30px; letter-spacing: -0.6px; margin: 0 0 8px; }
-.report-lede { color: var(--dim); font-size: 16px; max-width: 760px; margin: 0 0 22px; line-height: 1.55; }
+.report-hero h1 { font-size: 32px; letter-spacing: -0.6px; margin: 4px 0 8px; }
+.report-kicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--accent); }
+.report-lede { color: var(--dim); font-size: 16px; max-width: 820px; margin: 0 0 20px; line-height: 1.55; }
+.report-lede strong { color: var(--ink); }
+
+/* headline verdict (diverging bar) */
+.verdict { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 18px 20px; margin: 0 0 18px; }
+.verdict-stat { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.verdict-pct { font-size: 46px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.verdict-text { font-size: 16px; color: var(--ink); max-width: 560px; line-height: 1.4; }
+.battle { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--bg); }
+.battle-seg { height: 100%; }
+.battle-seg.os { background: var(--oscar); }
+.battle-seg.even { background: #cbd3dd; }
+.battle-seg.fl { background: var(--bcbs); }
+.battle-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 10px; font-size: 12.5px; color: var(--dim); }
+.battle-legend b { color: var(--ink); }
+.battle-legend .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: middle; }
+
+/* "what each payer adds" leaderboards */
+.lb-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.lb { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; }
+.lb-head { font-size: 13px; color: var(--dim); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.lb-rows { display: flex; flex-direction: column; gap: 10px; }
+.lb-row { display: grid; grid-template-columns: 175px 1fr 28px; align-items: center; gap: 10px; }
+.lb-label { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-track { background: var(--bg); border-radius: 6px; height: 16px; overflow: hidden; }
+.lb-fill { display: block; height: 100%; border-radius: 6px; opacity: .85; }
+.lb-fill.src-oscar { background: var(--oscar); }
+.lb-fill.src-bcbsfl { background: var(--bcbs); }
+.lb-n { font-size: 13px; font-weight: 700; text-align: right; }
+
+/* biggest-divergence cards */
+.diverge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.diverge-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color .12s, transform .12s; }
+.diverge-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.diverge-label { font-weight: 600; font-size: 14px; color: var(--ink); line-height: 1.3; }
+.diverge-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+.diverge-n { font-size: 12px; font-weight: 700; color: #9a3412; }
 .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
 .kpi-accent { border-color: #f1c9b8; background: #fff8f4; }
@@ -340,7 +381,9 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 720px) {
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
-  .gap-cols, .cmp-sides, .llm-only { grid-template-columns: 1fr; }
+  .gap-cols, .cmp-sides, .llm-only, .lb-pair { grid-template-columns: 1fr; }
+  .lb-row { grid-template-columns: 120px 1fr 24px; }
+  .verdict-pct { font-size: 38px; }
   .cmp-head { grid-template-columns: 1fr auto 20px; }
   .cmp-cat { display: none; }
   .req-row { grid-template-columns: 1fr 110px 110px; }
