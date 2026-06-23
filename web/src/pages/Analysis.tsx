@@ -152,8 +152,8 @@ export default function AnalysisPage() {
         <DrugFamilies />
       </Section>
 
-      <Section title="Coverage gaps"
-        subtitle="Topics where only one payer publishes a dedicated guideline (see method note below).">
+      <Section title="One payer has a policy, the other doesn't"
+        subtitle="Dedicated guidelines published by only one payer — a potential coverage gap (or competitive opening) for the payer that has no counterpart. Each is described from its own policy text. See the method note for the caveat on what 'no policy' means.">
         <GapColumns a={a} />
       </Section>
 
@@ -395,30 +395,73 @@ function ComparisonTable({ comparisons }: { comparisons: Comparison[] }) {
 function GapColumns({ a }: { a: Analysis }) {
   return (
     <div className="gap-cols">
-      {([["bcbsfl", FL, a.gaps.bcbsfl, a.summary.bcbsfl_gap_categories],
-         ["oscar", OS, a.gaps.oscar, a.summary.oscar_gap_categories]] as const).map(
-        ([src, label, items, catCounts]) => (
-          <div key={src} className="gap-col">
-            <div className="gap-colhead">
-              <span className={`src-chip ${src === "bcbsfl" ? "src-bcbsfl" : "src-oscar"}`}>{label}</span>
-              <span className="dim"> only · {items.length} guidelines</span>
+      <GapColumn
+        src="bcbsfl" has={FL} lacks={OS}
+        items={a.gaps.bcbsfl} catCounts={a.summary.bcbsfl_gap_categories}
+      />
+      <GapColumn
+        src="oscar" has={OS} lacks={FL}
+        items={a.gaps.oscar} catCounts={a.summary.oscar_gap_categories}
+      />
+    </div>
+  );
+}
+
+function GapColumn({
+  src, has, lacks, items, catCounts,
+}: {
+  src: "bcbsfl" | "oscar"; has: string; lacks: string;
+  items: Analysis["gaps"]["bcbsfl"]; catCounts: Record<string, number>;
+}) {
+  const [q, setQ] = useState("");
+  const [all, setAll] = useState(false);
+  const filtered = useMemo(() => {
+    const n = q.trim().toLowerCase();
+    return n
+      ? items.filter((g) => g.label.toLowerCase().includes(n) ||
+          (g.description || "").toLowerCase().includes(n) ||
+          g.category.toLowerCase().includes(n))
+      : items;
+  }, [items, q]);
+  const shown = all ? filtered : filtered.slice(0, 12);
+
+  return (
+    <div className="gap-col">
+      <div className="gap-colhead">
+        <span className={`src-chip ${src === "bcbsfl" ? "src-bcbsfl" : "src-oscar"}`}>{has}</span>
+        <span className="gap-colhead-text">has a policy · <strong>{lacks}</strong> doesn't</span>
+      </div>
+      <p className="gap-colsub">
+        {items.length} dedicated guidelines with no {lacks} counterpart — a potential coverage
+        gap (or an opportunity) for {lacks}.
+      </p>
+      <div className="gap-cats">
+        {Object.entries(catCounts).slice(0, 6).map(([c, n]) => (
+          <span key={c} className="gap-cat"><b>{n}</b> {c}</span>
+        ))}
+      </div>
+      <input
+        className="gap-search"
+        placeholder={`Filter ${has}-only policies…`}
+        value={q}
+        onChange={(e) => { setQ(e.target.value); setAll(true); }}
+      />
+      <div className="gap-cards">
+        {shown.map((g) => (
+          <Link key={g.topic_id} to={`/topic/${g.topic_id}`} className="gap-card">
+            <div className="gap-card-top">
+              <span className="gap-card-name">{g.label}</span>
+              {g.policy_id && <span className="mono dim">{g.policy_id}</span>}
             </div>
-            <div className="gap-cats">
-              {Object.entries(catCounts).slice(0, 8).map(([c, n]) => (
-                <span key={c} className="gap-cat"><b>{n}</b> {c}</span>
-              ))}
-            </div>
-            <ul className="gap-list">
-              {items.slice(0, 40).map((g) => (
-                <li key={g.topic_id}>
-                  <Link to={`/topic/${g.topic_id}`}>{g.label}</Link>
-                  {g.policy_id && <span className="mono dim"> {g.policy_id}</span>}
-                </li>
-              ))}
-            </ul>
-            {items.length > 40 && <div className="dim more">+ {items.length - 40} more</div>}
-          </div>
-        )
+            {g.description && <p className="gap-card-desc">{g.description}</p>}
+            <span className="gap-card-cat">{g.category}</span>
+          </Link>
+        ))}
+      </div>
+      {!all && filtered.length > shown.length && (
+        <button className="gap-more" onClick={() => setAll(true)}>
+          Show all {filtered.length} →
+        </button>
       )}
     </div>
   );

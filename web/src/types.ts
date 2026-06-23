@@ -22,6 +22,7 @@ export interface Topic {
   cross_payer: boolean;
   members: string[];
   score: number;
+  llm_matched?: boolean;
 }
 
 export interface PolicyText {
@@ -100,9 +101,11 @@ export interface Finding {
 
 export interface GapItem {
   topic_id: number;
+  id?: string;
   label: string;
   policy_id: string | null;
   category: string;
+  description?: string;
 }
 
 export interface DrugRef {

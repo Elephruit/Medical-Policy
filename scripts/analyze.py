@@ -254,6 +254,12 @@ def main() -> int:
             if i % 10 == 0 or i == n:
                 print(f"  {i}/{n}")
 
+    # Per-policy LLM profiles (one_liner descriptions) for gap items, if present.
+    profiles = {}
+    pf = Path("data/llm_profiles.json")
+    if pf.exists():
+        profiles = {k: v for k, v in json.loads(pf.read_text()).items() if v}
+
     # gaps: single-payer topics that are real guidelines
     def topic_real(t):
         return any(id2meta[m]["policy_id"] for m in t["members"])
@@ -263,11 +269,14 @@ def main() -> int:
         for t in topics:
             if t["sources"] == [source] and topic_real(t):
                 m = next((m for m in t["members"] if id2meta[m]["policy_id"]), t["members"][0])
+                prof = profiles.get(m) or {}
                 out.append({
                     "topic_id": t["topic_id"],
+                    "id": m,
                     "label": re.sub(r"\([^)]*\)$", "", t["label"]).strip() or t["label"],
                     "policy_id": id2meta[m]["policy_id"],
                     "category": category_of(m),
+                    "description": (prof.get("one_liner") or "").strip(),
                 })
         out.sort(key=lambda g: (g["category"], g["label"]))
         return out

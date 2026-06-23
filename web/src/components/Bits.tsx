@@ -17,3 +17,18 @@ export function ScoreBadge({ score }: { score: number }) {
     </span>
   );
 }
+
+// How a cross-payer topic was matched: by the LLM subject-normalization pass, or
+// by the deterministic title/text-similarity matcher.
+export function MatchBadge({ crossPayer, llmMatched }: { crossPayer: boolean; llmMatched?: boolean }) {
+  if (!crossPayer) return null;
+  return llmMatched ? (
+    <span className="match-badge ai" title="Matched by AI subject normalization — the title matcher missed this one">
+      AI-matched
+    </span>
+  ) : (
+    <span className="match-badge code" title="Matched by deterministic title/text similarity">
+      Code-matched
+    </span>
+  );
+}

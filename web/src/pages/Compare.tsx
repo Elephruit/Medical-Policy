@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadAnalysis, useData } from "../data";
 import type { Comparison } from "../types";
-import { SourceChip, ScoreBadge } from "../components/Bits";
+import { MatchBadge } from "../components/Bits";
 import { RestrictivenessChip } from "../components/Comparison";
 
 export default function Compare() {
@@ -64,12 +64,7 @@ export default function Compare() {
         {rows.map((t) => (
           <Link key={t.topic_id} to={`/topic/${t.topic_id}`} className="topic-row">
             <div className="topic-main">
-              <span className="topic-label">
-                {t.label}
-                {cmpById.get(t.topic_id)?.llm_matched && (
-                  <span className="ai-badge" title="Matched by AI subject normalization">AI-matched</span>
-                )}
-              </span>
+              <span className="topic-label">{t.label}</span>
               <span className="topic-meta">{t.size} policies</span>
             </div>
             <div className="topic-side">
@@ -77,10 +72,7 @@ export default function Compare() {
                 const c = cmpById.get(t.topic_id);
                 return c ? <RestrictivenessChip c={c} /> : null;
               })()}
-              {t.sources.map((s) => (
-                <SourceChip key={s} source={s} />
-              ))}
-              {t.cross_payer && <ScoreBadge score={t.score} />}
+              <MatchBadge crossPayer={t.cross_payer} llmMatched={t.llm_matched} />
             </div>
           </Link>
         ))}
