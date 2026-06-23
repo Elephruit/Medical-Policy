@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadAnalysis, loadDrugFamilies } from "../data";
 import type { Analysis, Comparison, DrugFamily, Finding } from "../types";
+import { Criteria } from "../components/Criteria";
 
 const FL = "Florida Blue";
 const OS = "Oscar";
@@ -306,10 +307,17 @@ function ComparisonBody({ c }: { c: Comparison }) {
         })}
       </div>
 
-      {/* Full criteria, side by side, so columns line up with the matrix above. */}
+      {/* Full criteria, side by side, parsed into a readable outline. Each side
+          is compared against the other so shared criteria tint green and
+          one-payer-only criteria tint orange. */}
+      <p className="cmp-legend">
+        <span className="legend-swatch shared" /> wording shared with the other payer
+        <span className="legend-swatch unique" /> appears on this payer only
+      </p>
       <div className="cmp-sides">
         {(["bcbsfl", "oscar"] as const).map((src) => {
           const side = c[src];
+          const other = src === "bcbsfl" ? c.oscar : c.bcbsfl;
           return (
             <div key={src} className="cmp-side">
               <div className="cmp-sidehead">
@@ -322,7 +330,7 @@ function ComparisonBody({ c }: { c: Comparison }) {
                 )}
               </div>
               <Link to={`/policy/${side.id}`} className="cmp-title">{side.title}</Link>
-              <p className="cmp-excerpt">{side.excerpt || "—"}</p>
+              <Criteria text={side.excerpt} compareTo={other.excerpt} />
             </div>
           );
         })}

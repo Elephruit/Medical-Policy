@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { loadText, useData } from "../data";
 import type { PolicyText } from "../types";
 import { SourceChip } from "../components/Bits";
+import { Criteria } from "../components/Criteria";
 
 export default function Policy() {
   const { id } = useParams();
@@ -62,7 +63,7 @@ export default function Policy() {
 
         <article className="detail-text">
           {text ? (
-            <pre className="fulltext">{text.full_text}</pre>
+            <Criteria text={text.full_text} emptyLabel="No text extracted." />
           ) : (
             <div className="muted">Loading full text…</div>
           )}
