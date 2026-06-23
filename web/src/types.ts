@@ -79,6 +79,25 @@ export interface GapItem {
   category: string;
 }
 
+export interface DrugRef {
+  policy_id: string;
+  title: string;
+  doc_key: string;
+  id: string;
+}
+export interface DrugMember {
+  drug: string;
+  generic: string;
+  bcbsfl: DrugRef | null;
+  oscar_perdrug: DrugRef | null;
+}
+export interface DrugFamily {
+  oscar_class: { policy_id: string; title: string; full_title: string; doc_key: string; version: string | null; id: string };
+  n_listed: number;
+  n_matched_bcbsfl: number;
+  members: DrugMember[];
+}
+
 export interface Analysis {
   summary: {
     total_policies: number;

@@ -233,10 +233,16 @@ def main() -> int:
     def cat_counts(items):
         return dict(Counter(i["category"] for i in items).most_common())
 
+    # Drug-family stats (class-guideline ↔ per-drug, content-based).
+    from policydb.drug_families import build_families
+    families = build_families([dict(r) for r in rows])
+
     summary = {
         "total_policies": len(rows),
         "by_source": {s: sum(1 for r in rows if r["source"] == s) for s in sorted({r["source"] for r in rows})},
         "cross_payer_topics": len(comparisons),
+        "drug_families": len(families),
+        "drug_family_links": sum(f["n_matched_bcbsfl"] for f in families),
         "bcbsfl_only": len(bcbs_gaps),
         "oscar_only": len(oscar_gaps),
         "topics_with_diffs": sum(1 for c in comparisons if c["diffs"]),

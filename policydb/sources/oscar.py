@@ -73,9 +73,18 @@ class OscarAdapter(SourceAdapter):
                         if section not in prev:
                             seen[slug].category_path = prev + " | " + section
                         continue
-                    m = CODE_VER.search(item)
-                    code = m.group(1).upper() if m else None
-                    ver = m.group(2) if (m and m.lastindex and m.group(2)) else None
+                    # The href (e.g. /medical/cg103v2) is the canonical code+version
+                    # source — more reliable than the title, where an abbreviation
+                    # like "(VMAT2)" can otherwise be mis-read as the code.
+                    code, ver = None, None
+                    hm = re.match(r"(CG|PG)(\d+)(?:v(\d+))?$", slug.split("/")[-1], re.I)
+                    if hm:
+                        code = (hm.group(1) + hm.group(2)).upper()
+                        ver = hm.group(3)
+                    else:
+                        m = CODE_VER.search(item)
+                        code = m.group(1).upper() if m else None
+                        ver = m.group(2) if (m and m.lastindex and m.group(2)) else None
                     seen[slug] = CatalogEntry(
                         source=self.slug,
                         doc_key=slug,

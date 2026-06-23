@@ -81,15 +81,19 @@ def build_topics(
         v: Dict[str, float] = defaultdict(float)
         for w in tk:
             v[w] += idf.get(w, 0.0)
-        norm = math.sqrt(sum(x * x for x in v.values())) or 1.0
+        # Sort the squared terms so the norm is byte-identical run to run (dict
+        # value order varies with PYTHONHASHSEED, which else perturbs the boundary).
+        norm = math.sqrt(sum(x * x for x in sorted(v.values()))) or 1.0
         return {w: x / norm for w, x in v.items()}
 
     vecs = [vec(tk) for tk in toks]
 
     def cos(a: Dict[str, float], b: Dict[str, float]) -> float:
-        if len(a) > len(b):
-            a, b = b, a
-        return sum(x * b.get(w, 0.0) for w, x in a.items())
+        # Iterate the *sorted shared keys* so the result is byte-identical
+        # regardless of arg order or dict iteration order (both vary with
+        # PYTHONHASHSEED). Otherwise cos(i,j) and cos(j,i) can differ in the last
+        # FP bits and a pair sitting on the threshold flips between runs.
+        return sum(a[w] * b[w] for w in sorted(a.keys() & b.keys()))
 
     uf = _UnionFind(len(docs))
     scores: Dict[int, float] = {}  # best link score per doc, for confidence display
@@ -109,34 +113,30 @@ def build_topics(
         for w in set(tk):
             by_token[w].append(i)
 
-    checked: set = set()
+    # For each candidate cross-source pair, decide ONCE using *all* their shared
+    # tokens — not per-token — so the result can't depend on token iteration order.
+    # A pair links if cosine >= threshold, or a shared near-unique term (df<=3,
+    # len>=7: a drug name like "ciltacabtagene") rescues a borderline pair (cosine
+    # floor 0.28 so a generic word like "accessories" can't chain unrelated topics).
+    pair_tokens: Dict[tuple, set] = defaultdict(set)
     for w, members in by_token.items():
-        if len(members) > 400:  # ultra-common token — skip as a blocking key
+        if len(members) > 400:  # ultra-common token — not a useful blocking key
             continue
-        # A near-unique term shared across payers (a drug name, "viscosupplementation",
-        # "ciltacabtagene") is decisive on its own — link regardless of cosine. This
-        # rescues long/verbose titles whose cosine is diluted. df<=3 keeps it safe:
-        # moderately common words like "growth" or "tissue" never qualify.
-        rare = df[w] <= 3 and len(w) >= 7
         for a_i in range(len(members)):
             i = members[a_i]
             for b_i in range(a_i + 1, len(members)):
                 j = members[b_i]
-                if docs[i]["source"] == docs[j]["source"]:
-                    continue
-                key = (i, j) if i < j else (j, i)
-                if key in checked:
-                    continue
-                checked.add(key)
-                sc = cos(vecs[i], vecs[j])
-                # The rare term only *rescues* a borderline pair (cosine floor 0.28),
-                # never creates one from a single generic word like "accessories"
-                # (which would otherwise chain unrelated topics via union-find).
-                if sc >= threshold or (rare and sc >= 0.28):
-                    uf.union(i, j)
-                    link = max(sc, 0.9) if rare else sc
-                    scores[i] = max(scores.get(i, 0), link)
-                    scores[j] = max(scores.get(j, 0), link)
+                if docs[i]["source"] != docs[j]["source"]:
+                    pair_tokens[(i, j) if i < j else (j, i)].add(w)
+
+    for (i, j), shared in pair_tokens.items():
+        sc = round(cos(vecs[i], vecs[j]), 9)
+        has_rare = any(df[w] <= 3 and len(w) >= 7 for w in shared)
+        if sc >= threshold or (has_rare and sc >= 0.28):
+            uf.union(i, j)
+            link = max(sc, 0.9) if has_rare else sc
+            scores[i] = max(scores.get(i, 0), link)
+            scores[j] = max(scores.get(j, 0), link)
 
     # Assemble components into topics.
     comp: Dict[int, List[int]] = defaultdict(list)

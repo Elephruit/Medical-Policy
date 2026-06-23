@@ -226,3 +226,21 @@ a { color: inherit; text-decoration: none; }
   .cmp-cat, .cmp-diffs { display: none; }
   .diffbar { grid-template-columns: 130px 1fr 30px; }
 }
+
+/* drug families */
+.hero-foot { color: var(--dim); font-size: 13.5px; margin: 14px 0 0; }
+.families { display: flex; flex-direction: column; gap: 12px; }
+.family { display: grid; grid-template-columns: minmax(220px, 1fr) 28px 1.3fr; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; }
+.family-oscar { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.family-class { font-weight: 600; color: var(--accent); line-height: 1.3; }
+.family-note { font-size: 11px; color: var(--oscar); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+.family-arrow { text-align: center; color: var(--dim); font-size: 20px; font-weight: 700; }
+.family-fl-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.family-drugs { display: flex; flex-wrap: wrap; gap: 6px; }
+.family-drug { display: inline-flex; align-items: center; gap: 6px; background: #f4f7fc; border: 1px solid #dce6f5; border-radius: 7px; padding: 4px 9px; }
+.family-drug:hover { border-color: var(--bcbs); }
+.fd-name { font-size: 12.5px; font-weight: 600; }
+@media (max-width: 720px) {
+  .family { grid-template-columns: 1fr; }
+  .family-arrow { transform: rotate(90deg); }
+}

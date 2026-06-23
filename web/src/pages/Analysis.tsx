@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { loadAnalysis } from "../data";
-import type { Analysis, Comparison, Finding } from "../types";
+import { loadAnalysis, loadDrugFamilies } from "../data";
+import type { Analysis, Comparison, DrugFamily, Finding } from "../types";
 
 const FL = "Florida Blue";
 const OS = "Oscar";
@@ -29,6 +29,10 @@ export default function AnalysisPage() {
           <Kpi n={s.bcbsfl_only} label="Florida Blue only" sub="dedicated guideline" cls="src-bcbsfl-text" />
           <Kpi n={s.oscar_only} label="Oscar only" sub="dedicated guideline" cls="src-oscar-text" />
         </div>
+        <p className="hero-foot">
+          Plus <strong>{(s as any).drug_family_links ?? ""}</strong> Florida Blue per-drug policies
+          that map to <strong>{(s as any).drug_families ?? ""}</strong> consolidated Oscar drug-class
+          guidelines — see “Drug families” below.</p>
       </div>
 
       <Section title="How to read this" subtle>
@@ -73,12 +77,63 @@ export default function AnalysisPage() {
         <ComparisonTable comparisons={a.comparisons} />
       </Section>
 
+      <Section title="Drug families: one Oscar guideline vs. many Florida Blue policies"
+        subtitle="Where title-matching can't reach: Oscar bundles a drug class into a single guideline; Florida Blue publishes a separate policy per drug. Matched by reading the drug list inside each Oscar class guideline.">
+        <DrugFamilies />
+      </Section>
+
       <Section title="Coverage gaps"
         subtitle="Topics where only one payer publishes a dedicated guideline (see caveat above).">
         <GapColumns a={a} />
       </Section>
     </div>
   );
+}
+
+function DrugFamilies() {
+  const [fams, setFams] = useState<DrugFamily[] | null>(null);
+  useEffect(() => {
+    loadDrugFamilies().then(setFams);
+  }, []);
+  if (!fams) return <div className="muted">Loading drug families…</div>;
+  return (
+    <div className="families">
+      {fams.map((f) => (
+        <div key={f.oscar_class.policy_id} className="family">
+          <div className="family-oscar">
+            <span className="src-chip src-oscar">{OS}</span>
+            <Link to={`/policy/${f.oscar_class.id}`} className="family-class">
+              {f.oscar_class.title}
+            </Link>
+            <span className="mono dim">{f.oscar_class.policy_id}</span>
+            <div className="family-note">1 combined guideline</div>
+          </div>
+          <div className="family-arrow">→</div>
+          <div className="family-fl">
+            <div className="family-fl-head">
+              <span className="src-chip src-bcbsfl">{FL}</span>
+              <span className="dim">{f.n_matched_bcbsfl} separate policies</span>
+            </div>
+            <div className="family-drugs">
+              {f.members.filter((m) => m.bcbsfl).map((m) => (
+                <Link key={m.bcbsfl!.policy_id} to={`/policy/${m.bcbsfl!.id}`} className="family-drug">
+                  <span className="fd-name">{drugName(m.bcbsfl!.title, m.drug)}</span>
+                  <span className="mono dim">{m.bcbsfl!.policy_id}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Prefer the brand from the Florida Blue title (handles Oscar sub-brand fragments).
+function drugName(flTitle: string, fallback: string): string {
+  const m = flTitle.match(/\(([^)]+)\)/);
+  if (m) return m[1].split(/[,;]/)[0].trim();
+  return flTitle.split(/[(,]/)[0].trim() || fallback;
 }
 
 function Kpi({ n, label, sub, accent, cls }: { n: number; label: string; sub: string; accent?: boolean; cls?: string }) {

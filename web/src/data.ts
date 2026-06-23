@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import MiniSearch from "minisearch";
-import type { Analysis, Meta, Policy, PolicyText, Topic } from "./types";
+import type { Analysis, DrugFamily, Meta, Policy, PolicyText, Topic } from "./types";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -56,6 +56,16 @@ export function loadAnalysis(): Promise<Analysis> {
     );
   }
   return analysisPromise;
+}
+
+let familiesPromise: Promise<DrugFamily[]> | null = null;
+export function loadDrugFamilies(): Promise<DrugFamily[]> {
+  if (!familiesPromise) {
+    familiesPromise = fetch(`${BASE}data/drug_families.json`).then(
+      (r) => r.json() as Promise<DrugFamily[]>
+    );
+  }
+  return familiesPromise;
 }
 
 export const DataContext = createContext<Dataset | null>(null);

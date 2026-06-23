@@ -68,7 +68,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default="data/policies.db")
     ap.add_argument("--out", default="web/public/data")
-    ap.add_argument("--threshold", type=float, default=0.5)
+    ap.add_argument("--threshold", type=float, default=0.40)
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -123,11 +123,33 @@ def main() -> int:
     (out / "index.json").write_text(json.dumps(index))
     (out / "topics.json").write_text(json.dumps(topics))
 
+    # Drug families: Oscar class guidelines mapped to per-drug policies (content-based).
+    from policydb.drug_families import build_families
+    all_rows = [dict(r) for r in rows]
+    families = build_families(all_rows)
+
+    def web_id(ref):
+        return make_id(
+            "oscar" if ref["policy_id"].upper().startswith(("CG", "PG")) else "bcbsfl",
+            ref["doc_key"],
+        ) if ref else None
+
+    for fam in families:
+        fam["oscar_class"]["id"] = make_id("oscar", fam["oscar_class"]["doc_key"])
+        for m in fam["members"]:
+            if m["bcbsfl"]:
+                m["bcbsfl"]["id"] = make_id("bcbsfl", m["bcbsfl"]["doc_key"])
+            if m["oscar_perdrug"]:
+                m["oscar_perdrug"]["id"] = make_id("oscar", m["oscar_perdrug"]["doc_key"])
+    (out / "drug_families.json").write_text(json.dumps(families))
+
     cross = [t for t in topics if t["cross_payer"]]
     meta = {
         "policy_count": len(index),
         "topic_count": len(topics),
         "cross_payer_topics": len(cross),
+        "drug_families": len(families),
+        "drug_family_links": sum(f["n_matched_bcbsfl"] for f in families),
         "sources": [
             {"slug": s, "label": SOURCE_LABELS.get(s, s),
              "count": sum(1 for i in index if i["source"] == s)}
