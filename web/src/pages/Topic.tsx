@@ -52,7 +52,7 @@ export default function Topic() {
     <div>
       <div className="page-head">
         <div>
-          <Link to="/" className="back">← All topics</Link>
+          <Link to="/compare" className="back">← All topics</Link>
           <h1>{topic.label}</h1>
           <p className="sub">
             {topic.cross_payer

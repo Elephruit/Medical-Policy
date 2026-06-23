@@ -7,6 +7,12 @@ import Browse from "./pages/Browse";
 import Policy from "./pages/Policy";
 import AnalysisPage from "./pages/Analysis";
 
+const NAV = [
+  { to: "/", label: "Overview", icon: "▦", end: true },
+  { to: "/compare", label: "Compare", icon: "⇆" },
+  { to: "/browse", label: "Browse", icon: "≣" },
+];
+
 export default function App() {
   const [data, setData] = useState<Dataset | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,34 +26,48 @@ export default function App() {
 
   return (
     <DataContext.Provider value={data}>
-      <header className="topbar">
-        <Link to="/" className="brand">
-          Payer&nbsp;Policy&nbsp;<span>Compare</span>
-        </Link>
-        <nav>
-          <NavLink to="/" end>Compare</NavLink>
-          <NavLink to="/report">Report</NavLink>
-          <NavLink to="/browse">Browse</NavLink>
-        </nav>
-        <div className="stats">
-          {data.meta.policy_count.toLocaleString()} policies ·{" "}
-          {data.meta.cross_payer_topics} cross-payer topics
-        </div>
-      </header>
-      <main className="content">
-        <Routes>
-          <Route path="/" element={<Compare />} />
-          <Route path="/report" element={<AnalysisPage />} />
-          <Route path="/topic/:id" element={<Topic />} />
-          <Route path="/browse" element={<Browse />} />
-          <Route path="/policy/:id" element={<Policy />} />
-        </Routes>
-      </main>
-      <footer className="footer">
-        Sources:{" "}
-        {data.meta.sources.map((s) => `${s.label} (${s.count})`).join(" · ")}
-        {" — "}data scraped from public clinical-guideline pages.
-      </footer>
+      <div className="shell">
+        <aside className="sidebar">
+          <Link to="/" className="brand">
+            <span className="brand-mark">P</span>
+            <span className="brand-text">Policy<strong>DB</strong></span>
+          </Link>
+          <nav className="side-nav">
+            {NAV.map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.end} className="side-link">
+                <span className="side-ico">{n.icon}</span>
+                <span>{n.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+          <div className="side-foot">
+            <div className="side-stat">
+              <span className="side-stat-n">{data.meta.policy_count.toLocaleString()}</span>
+              <span className="side-stat-l">policies</span>
+            </div>
+            <div className="side-stat">
+              <span className="side-stat-n">{data.meta.cross_payer_topics}</span>
+              <span className="side-stat-l">cross-payer topics</span>
+            </div>
+            <p className="side-src">
+              {data.meta.sources.map((s) => s.label).join(" · ")} — public
+              clinical-guideline data.
+            </p>
+          </div>
+        </aside>
+
+        <main className="main">
+          <div className="main-inner">
+            <Routes>
+              <Route path="/" element={<AnalysisPage />} />
+              <Route path="/compare" element={<Compare />} />
+              <Route path="/topic/:id" element={<Topic />} />
+              <Route path="/browse" element={<Browse />} />
+              <Route path="/policy/:id" element={<Policy />} />
+            </Routes>
+          </div>
+        </main>
+      </div>
     </DataContext.Provider>
   );
 }

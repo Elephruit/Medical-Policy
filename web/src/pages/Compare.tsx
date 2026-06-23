@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadAnalysis, useData } from "../data";
 import type { Comparison } from "../types";
-import { MatchBadge } from "../components/Bits";
 import { RestrictivenessChip } from "../components/Comparison";
 
 export default function Compare() {
@@ -65,14 +64,20 @@ export default function Compare() {
           <Link key={t.topic_id} to={`/topic/${t.topic_id}`} className="topic-row">
             <div className="topic-main">
               <span className="topic-label">{t.label}</span>
-              <span className="topic-meta">{t.size} policies</span>
+              <span className="topic-meta">
+                {t.size} policies
+                {t.cross_payer && (
+                  <span className="match-note">
+                    {" · "}{t.llm_matched ? "AI-matched" : "matched by title similarity"}
+                  </span>
+                )}
+              </span>
             </div>
             <div className="topic-side">
               {(() => {
                 const c = cmpById.get(t.topic_id);
-                return c ? <RestrictivenessChip c={c} /> : null;
+                return c ? <RestrictivenessChip c={c} /> : <span className="topic-arrow">→</span>;
               })()}
-              <MatchBadge crossPayer={t.cross_payer} llmMatched={t.llm_matched} />
             </div>
           </Link>
         ))}
