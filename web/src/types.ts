@@ -52,6 +52,30 @@ export interface Side {
   consolidated_into: string | null;
 }
 
+export interface AlignedCriterion {
+  category: string;
+  florida_blue: string;
+  oscar: string;
+  agreement: "same" | "differs";
+}
+export interface SoloCriterion {
+  category: string;
+  detail: string;
+}
+export interface Restrictiveness {
+  more_restrictive: "Florida Blue" | "Oscar" | "neither";
+  magnitude: "none" | "minor" | "moderate" | "substantial";
+  rationale: string;
+  cost_note: string;
+}
+export interface LlmComparison {
+  summary: string;
+  shared: AlignedCriterion[];
+  florida_blue_only: SoloCriterion[];
+  oscar_only: SoloCriterion[];
+  restrictiveness?: Restrictiveness;
+}
+
 export interface Comparison {
   topic_id: number;
   label: string;
@@ -60,6 +84,8 @@ export interface Comparison {
   bcbsfl: Side;
   oscar: Side;
   diffs: { key: string; label: string; only: string }[];
+  llm?: LlmComparison | null;
+  llm_matched?: boolean;
 }
 
 export interface Finding {
@@ -109,6 +135,12 @@ export interface Analysis {
     diff_type_counts: Record<string, number>;
     bcbsfl_gap_categories: Record<string, number>;
     oscar_gap_categories: Record<string, number>;
+    llm_matched_topics?: number;
+    restrictiveness?: {
+      scored: number;
+      by_payer: Record<string, number>;
+      substantial: Record<string, number>;
+    } | null;
     source_labels: Record<string, string>;
   };
   findings: Finding[];

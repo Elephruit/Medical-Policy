@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadAnalysis, loadDrugFamilies } from "../data";
-import type { Analysis, Comparison, DrugFamily, Finding } from "../types";
+import type { Analysis, Comparison, DrugFamily, Finding, LlmComparison } from "../types";
 import { Criteria } from "../components/Criteria";
 
 const FL = "Florida Blue";
@@ -72,6 +72,13 @@ export default function AnalysisPage() {
           ))}
         </div>
       </Section>
+
+      {s.restrictiveness && s.restrictiveness.scored > 0 && (
+        <Section title="Who runs tighter criteria"
+          subtitle="Across topics with an AI-read comparison, which payer is harder to get approved under. Tighter criteria likely lower utilization and cost for that payer — but can drive member and provider abrasion, so weigh against the actual cost of each service.">
+          <Restrictiveness r={s.restrictiveness} labels={s.source_labels} />
+        </Section>
+      )}
 
       <Section title="Topic-by-topic comparison"
         subtitle="Every overlapping topic with its extracted coverage criteria. Open one to read both side by side.">
@@ -232,11 +239,14 @@ function ComparisonTable({ comparisons }: { comparisons: Comparison[] }) {
       <div className="cmp-table">
         {rows.map((c) => {
           const open = openId === c.topic_id;
-          const n = c.diffs.length;
+          const n = diffCount(c);
           return (
             <div key={c.topic_id} className={`cmp ${open ? "open" : ""}`}>
               <button className="cmp-head" onClick={() => setOpenId(open ? null : c.topic_id)}>
-                <span className="cmp-label">{c.label}</span>
+                <span className="cmp-label">
+                  {c.label}
+                  {c.llm_matched && <span className="ai-badge" title="Matched by AI subject normalization">AI-matched</span>}
+                </span>
                 <span className="cmp-cat">{c.category}</span>
                 <span className={`cmp-status ${n === 0 ? "is-aligned" : "is-diff"}`}>
                   {n === 0
@@ -254,13 +264,178 @@ function ComparisonTable({ comparisons }: { comparisons: Comparison[] }) {
   );
 }
 
-function ComparisonBody({ c }: { c: Comparison }) {
-  const flOnly = c.diffs.filter((d) => d.only === FL).map((d) => d.label);
-  const osOnly = c.diffs.filter((d) => d.only === OS).map((d) => d.label);
+function diffCount(c: Comparison): number {
+  if (c.llm) {
+    return (
+      c.llm.florida_blue_only.length +
+      c.llm.oscar_only.length +
+      c.llm.shared.filter((s) => s.agreement === "differs").length
+    );
+  }
+  return c.diffs.length;
+}
 
+function ComparisonBody({ c }: { c: Comparison }) {
   return (
     <div className="cmp-body">
-      {/* What differs — plain-English summary of the mismatched requirements. */}
+      {c.llm ? <LlmView llm={c.llm} /> : <HeuristicView c={c} />}
+
+      {/* Source criteria, side by side, for reference. Without an LLM comparison
+          we also tint shared (green) vs one-payer-only (orange) wording. */}
+      <details className="cmp-source">
+        <summary>Source criteria text</summary>
+        {!c.llm && (
+          <p className="cmp-legend">
+            <span className="legend-swatch shared" /> wording shared with the other payer
+            <span className="legend-swatch unique" /> appears on this payer only
+          </p>
+        )}
+        <div className="cmp-sides">
+          {(["bcbsfl", "oscar"] as const).map((src) => {
+            const side = c[src];
+            const other = src === "bcbsfl" ? c.oscar : c.bcbsfl;
+            return (
+              <div key={src} className="cmp-side">
+                <div className="cmp-sidehead">
+                  <span className={`src-chip ${src === "bcbsfl" ? "src-bcbsfl" : "src-oscar"}`}>
+                    {src === "bcbsfl" ? FL : OS}
+                  </span>
+                  <span className="mono dim">{side.policy_id || "—"}</span>
+                  {side.consolidated_into && (
+                    <span className="consol">via class guideline {side.consolidated_into}</span>
+                  )}
+                </div>
+                <Link to={`/policy/${side.id}`} className="cmp-title">{side.title}</Link>
+                <Criteria text={side.excerpt} compareTo={c.llm ? undefined : other.excerpt} />
+              </div>
+            );
+          })}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+// LLM-aligned comparison: a plain summary, the criteria unique to each payer,
+// and a row-by-row table of the requirements they share (flagging where the
+// specifics differ).
+function LlmView({ llm }: { llm: LlmComparison }) {
+  const { summary, shared, florida_blue_only: flOnly, oscar_only: osOnly } = llm;
+  const differing = shared.filter((s) => s.agreement === "differs").length;
+
+  const r = llm.restrictiveness;
+  return (
+    <div className="llm">
+      {summary && <p className="llm-summary">{summary}</p>}
+
+      {r && r.more_restrictive !== "neither" && r.magnitude !== "none" && (
+        <div className={`restr ${r.more_restrictive === FL ? "restr-fl" : "restr-os"}`}>
+          <div className="restr-head">
+            <span className={`src-chip ${r.more_restrictive === FL ? "src-bcbsfl" : "src-oscar"}`}>
+              {r.more_restrictive}
+            </span>
+            <span className="restr-tag">is more restrictive · {r.magnitude}</span>
+          </div>
+          <p className="restr-why">{r.rationale}</p>
+          {r.cost_note && <p className="restr-cost">{r.cost_note}</p>}
+        </div>
+      )}
+      {r && (r.more_restrictive === "neither" || r.magnitude === "none") && (
+        <div className="restr restr-even">
+          <span className="restr-tag">Comparable restrictiveness</span>
+          {r.rationale && <p className="restr-why">{r.rationale}</p>}
+        </div>
+      )}
+
+      {(flOnly.length > 0 || osOnly.length > 0) && (
+        <div className="llm-only">
+          <SoloColumn
+            title={FL}
+            cls="src-bcbsfl"
+            items={flOnly}
+            empty="Nothing required here that Oscar doesn't also require."
+          />
+          <SoloColumn
+            title={OS}
+            cls="src-oscar"
+            items={osOnly}
+            empty="Nothing required here that Florida Blue doesn't also require."
+          />
+        </div>
+      )}
+
+      {shared.length > 0 && (
+        <div className="llm-shared">
+          <div className="llm-shared-head">
+            <h4>Requirements both payers share</h4>
+            <span className="llm-shared-sub">
+              {differing > 0
+                ? `${differing} of ${shared.length} differ in the specifics`
+                : "specifics align"}
+            </span>
+          </div>
+          <div className="req-matrix">
+            <div className="req-row req-head llm-head">
+              <span className="req-name">Requirement</span>
+              <span className="req-cell"><span className="src-chip src-bcbsfl">{FL}</span></span>
+              <span className="req-cell"><span className="src-chip src-oscar">{OS}</span></span>
+            </div>
+            {shared.map((s, i) => (
+              <div key={i} className={`req-row llm-srow ${s.agreement === "differs" ? "is-diff" : ""}`}>
+                <span className="req-name">
+                  {s.category}
+                  <span className={`agree-pill ${s.agreement}`}>
+                    {s.agreement === "differs" ? "differs" : "same"}
+                  </span>
+                </span>
+                <span className="req-cell llm-val">{s.florida_blue}</span>
+                <span className="req-cell llm-val">{s.oscar}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {shared.length === 0 && flOnly.length === 0 && osOnly.length === 0 && (
+        <p className="cmp-verdict aligned">
+          No structured criteria could be extracted for this topic — see the source text below.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SoloColumn({
+  title, cls, items, empty,
+}: { title: string; cls: string; items: { category: string; detail: string }[]; empty: string }) {
+  return (
+    <div className="solo-col">
+      <div className="solo-head">
+        <span className={`src-chip ${cls}`}>{title}</span>
+        <span className="solo-count">only · {items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="solo-empty">{empty}</p>
+      ) : (
+        <ul className="solo-list">
+          {items.map((it, i) => (
+            <li key={i}>
+              <span className="solo-cat">{it.category}</span>
+              <span className="solo-detail">{it.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Fallback when no LLM comparison is available: the regex-signal requirement matrix.
+function HeuristicView({ c }: { c: Comparison }) {
+  const flOnly = c.diffs.filter((d) => d.only === FL).map((d) => d.label);
+  const osOnly = c.diffs.filter((d) => d.only === OS).map((d) => d.label);
+  return (
+    <>
       {c.diffs.length === 0 ? (
         <p className="cmp-verdict aligned">
           Both payers apply the same set of tracked requirements on this topic. The wording
@@ -285,8 +460,6 @@ function ComparisonBody({ c }: { c: Comparison }) {
           </ul>
         </div>
       )}
-
-      {/* Requirement-by-requirement matrix — the at-a-glance "where do they differ". */}
       <div className="req-matrix">
         <div className="req-row req-head">
           <span className="req-name">Requirement</span>
@@ -306,36 +479,7 @@ function ComparisonBody({ c }: { c: Comparison }) {
           );
         })}
       </div>
-
-      {/* Full criteria, side by side, parsed into a readable outline. Each side
-          is compared against the other so shared criteria tint green and
-          one-payer-only criteria tint orange. */}
-      <p className="cmp-legend">
-        <span className="legend-swatch shared" /> wording shared with the other payer
-        <span className="legend-swatch unique" /> appears on this payer only
-      </p>
-      <div className="cmp-sides">
-        {(["bcbsfl", "oscar"] as const).map((src) => {
-          const side = c[src];
-          const other = src === "bcbsfl" ? c.oscar : c.bcbsfl;
-          return (
-            <div key={src} className="cmp-side">
-              <div className="cmp-sidehead">
-                <span className={`src-chip ${src === "bcbsfl" ? "src-bcbsfl" : "src-oscar"}`}>
-                  {src === "bcbsfl" ? FL : OS}
-                </span>
-                <span className="mono dim">{side.policy_id || "—"}</span>
-                {side.consolidated_into && (
-                  <span className="consol">via class guideline {side.consolidated_into}</span>
-                )}
-              </div>
-              <Link to={`/policy/${side.id}`} className="cmp-title">{side.title}</Link>
-              <Criteria text={side.excerpt} compareTo={other.excerpt} />
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -375,6 +519,47 @@ function GapColumns({ a }: { a: Analysis }) {
           </div>
         )
       )}
+    </div>
+  );
+}
+
+function Restrictiveness({
+  r, labels,
+}: {
+  r: { scored: number; by_payer: Record<string, number>; substantial: Record<string, number> };
+  labels: Record<string, string>;
+}) {
+  void labels;
+  const fl = r.by_payer[FL] || 0;
+  const os = r.by_payer[OS] || 0;
+  const even = r.by_payer["neither"] || 0;
+  const max = Math.max(fl, os, even, 1);
+  const rows: { name: string; cls: string; n: number; sub?: number }[] = [
+    { name: `${FL} tighter`, cls: "src-bcbsfl", n: fl, sub: r.substantial[FL] || 0 },
+    { name: `${OS} tighter`, cls: "src-oscar", n: os, sub: r.substantial[OS] || 0 },
+    { name: "Comparable", cls: "src-other", n: even },
+  ];
+  return (
+    <div className="restr-roll">
+      <p className="restr-roll-lede">
+        Of <b>{r.scored}</b> AI-compared topics:
+      </p>
+      <div className="restr-bars">
+        {rows.map((row) => (
+          <div className="restr-bar" key={row.name}>
+            <span className="restr-bar-label">
+              <span className={`dot ${row.cls}`} /> {row.name}
+            </span>
+            <span className="restr-bar-track">
+              <span className="restr-bar-fill" style={{ width: `${(row.n / max) * 100}%` }} />
+            </span>
+            <span className="restr-bar-n">
+              {row.n}
+              {row.sub ? <span className="restr-bar-sub"> · {row.sub} substantial</span> : null}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

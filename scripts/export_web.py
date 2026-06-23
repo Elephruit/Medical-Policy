@@ -69,6 +69,8 @@ def main() -> int:
     ap.add_argument("--db", default="data/policies.db")
     ap.add_argument("--out", default="web/public/data")
     ap.add_argument("--threshold", type=float, default=0.40)
+    ap.add_argument("--llm-links", default=None,
+                    help="JSON file of [[id_a,id_b],...] same-subject links to force-merge")
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -116,7 +118,27 @@ def main() -> int:
             "full_text": r["full_text"] or "",
         }))
 
-    id_to_topic, topics = build_topics(docs_for_match, threshold=args.threshold)
+    extra_links = None
+    if args.llm_links and Path(args.llm_links).exists():
+        extra_links = [tuple(p) for p in json.loads(Path(args.llm_links).read_text())]
+        print(f"loaded {len(extra_links)} LLM same-subject links from {args.llm_links}")
+    id_to_topic, topics = build_topics(
+        docs_for_match, threshold=args.threshold, extra_links=extra_links)
+
+    # Honest "AI-matched" flag: mark a topic only if it is cross-payer now but
+    # could NOT have been without the LLM links (i.e. at least one member was not
+    # in any cross-payer topic under the pure lexical matcher). This excludes
+    # topics the title matcher already linked, which LLM links merely re-confirmed.
+    if extra_links:
+        base_map, _ = build_topics(docs_for_match, threshold=args.threshold)
+        base_sources = {}
+        for d in docs_for_match:
+            base_sources.setdefault(base_map[d["id"]], set()).add(d["source"])
+        base_cross = {d["id"] for d in docs_for_match
+                      if len(base_sources[base_map[d["id"]]]) > 1}
+        for t in topics:
+            t["llm_matched"] = bool(t["cross_payer"]) and any(
+                m not in base_cross for m in t["members"])
     for item in index:
         item["topic_id"] = id_to_topic.get(item["id"])
 
@@ -148,6 +170,7 @@ def main() -> int:
         "policy_count": len(index),
         "topic_count": len(topics),
         "cross_payer_topics": len(cross),
+        "llm_matched_topics": sum(1 for t in cross if t.get("llm_matched")),
         "drug_families": len(families),
         "drug_family_links": sum(f["n_matched_bcbsfl"] for f in families),
         "sources": [

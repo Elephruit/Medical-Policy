@@ -110,6 +110,12 @@ def main() -> int:
     ap.add_argument("--out", default="web/public/data/analysis.json")
     ap.add_argument("--findings", default="data/analysis_findings.json")
     ap.add_argument("--digest", action="store_true", help="print a readable digest")
+    ap.add_argument("--llm", action="store_true",
+                    help="enrich each cross-payer topic with an LLM criteria comparison")
+    ap.add_argument("--model", default=None,
+                    help="model for --llm (default: policydb.llm_compare.DEFAULT_MODEL)")
+    ap.add_argument("--llm-cache", default="data/llm_cache",
+                    help="directory for cached LLM comparisons")
     args = ap.parse_args()
 
     conn = sqlite3.connect(args.db)
@@ -136,6 +142,18 @@ def main() -> int:
                         True, m.group(1))
             return best_criteria(text), False, None
         return best_criteria(text), False, None
+
+    def llm_text(row):
+        """A larger criteria slice for the LLM (follows FL consolidation), so the
+        model can find the real medical-necessity section even when our short
+        excerpt grabbed the wrong part of a messy PDF."""
+        text = row["full_text"] or ""
+        if row["source"] == "bcbsfl":
+            m = CONSOLIDATED.search(normalize(text))
+            if m and m.group(1) in bcbs_by_pid and m.group(1) != row["policy_id"]:
+                parent = bcbs_by_pid[m.group(1)]
+                return best_criteria(parent["full_text"], near=drug_terms(row["title"]), limit=7000)
+        return best_criteria(text, limit=7000)
     cats = {}
     for r in conn.execute("SELECT source, doc_key, category_path FROM placements"):
         cats.setdefault(make_id(r["source"], r["doc_key"]), []).append(r["category_path"])
@@ -206,8 +224,35 @@ def main() -> int:
             "bcbsfl": sides["bcbsfl"],
             "oscar": sides["oscar"],
             "diffs": diffs,
+            "llm_matched": t.get("llm_matched", False),
         })
     comparisons.sort(key=lambda c: (-len(c["diffs"]), -c["score"]))
+
+    # Optional: enrich each comparison with an LLM-aligned criteria comparison.
+    if args.llm:
+        from policydb.env import load_env
+        load_env()
+        import anthropic
+        from policydb import llm_compare
+
+        client = anthropic.Anthropic()
+        model = args.model or llm_compare.DEFAULT_MODEL
+        cache_dir = Path(args.llm_cache)
+        n = len(comparisons)
+        print(f"LLM comparison: {n} topics, model={model}, cache={cache_dir}")
+        for i, c in enumerate(comparisons, 1):
+            fl_text = llm_text(by_id[c["bcbsfl"]["id"]])
+            os_text = llm_text(by_id[c["oscar"]["id"]])
+            try:
+                c["llm"] = llm_compare.compare(
+                    client, label=c["label"], fl_text=fl_text, os_text=os_text,
+                    model=model, cache_dir=cache_dir, topic_id=c["topic_id"],
+                )
+            except Exception as e:  # don't lose the whole run to one bad call
+                print(f"  ! topic {c['topic_id']} ({c['label']}): {type(e).__name__}: {e}")
+                c["llm"] = None
+            if i % 10 == 0 or i == n:
+                print(f"  {i}/{n}")
 
     # gaps: single-payer topics that are real guidelines
     def topic_real(t):
@@ -237,6 +282,22 @@ def main() -> int:
     from policydb.drug_families import build_families
     families = build_families([dict(r) for r in rows])
 
+    # Restrictiveness rollup (only populated when --llm ran).
+    restr = [c["llm"]["restrictiveness"] for c in comparisons
+             if c.get("llm") and c["llm"].get("restrictiveness")]
+    restrictiveness_summary = None
+    if restr:
+        restrictiveness_summary = {
+            "scored": len(restr),
+            "by_payer": dict(Counter(r["more_restrictive"] for r in restr)),
+            "substantial": {
+                "Florida Blue": sum(1 for r in restr if r["more_restrictive"] == "Florida Blue"
+                                    and r.get("magnitude") == "substantial"),
+                "Oscar": sum(1 for r in restr if r["more_restrictive"] == "Oscar"
+                             and r.get("magnitude") == "substantial"),
+            },
+        }
+
     summary = {
         "total_policies": len(rows),
         "by_source": {s: sum(1 for r in rows if r["source"] == s) for s in sorted({r["source"] for r in rows})},
@@ -249,6 +310,8 @@ def main() -> int:
         "diff_type_counts": dict(Counter(d["label"] for c in comparisons for d in c["diffs"]).most_common()),
         "bcbsfl_gap_categories": cat_counts(bcbs_gaps),
         "oscar_gap_categories": cat_counts(oscar_gaps),
+        "llm_matched_topics": sum(1 for c in comparisons if c.get("llm_matched")),
+        "restrictiveness": restrictiveness_summary,
         "source_labels": SOURCE_LABELS,
     }
 
@@ -256,6 +319,20 @@ def main() -> int:
     fp = Path(args.findings)
     if fp.exists():
         findings = json.loads(fp.read_text())
+        # Topic ids renumber whenever matching changes (e.g. --llm-links merges).
+        # Re-point each hand-curated finding example to the current topic by its
+        # leading subject token (the generic drug name), so "Compare:" links stay
+        # correct.
+        by_first = {}
+        for c in comparisons:
+            toks = c["label"].split()
+            if toks:
+                by_first.setdefault(toks[0].lower(), c["topic_id"])
+        for fnd in findings:
+            for e in fnd.get("examples", []):
+                toks = (e.get("label") or "").split()
+                if toks and toks[0].lower() in by_first:
+                    e["topic_id"] = by_first[toks[0].lower()]
 
     out = {
         "summary": summary,

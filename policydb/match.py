@@ -65,9 +65,15 @@ class _UnionFind:
 
 
 def build_topics(
-    docs: List[dict], threshold: float = 0.40
+    docs: List[dict], threshold: float = 0.40,
+    extra_links: Optional[List[Tuple[str, str]]] = None,
 ) -> Tuple[Dict[str, int], List[dict]]:
-    """docs: [{id, source, title, policy_id}]. Returns (id->topic_id, topics)."""
+    """docs: [{id, source, title, policy_id}]. Returns (id->topic_id, topics).
+
+    extra_links: optional [(id_a, id_b), ...] pairs to force into the same topic
+    (e.g. LLM-derived same-subject links that the title matcher missed). Pairs
+    referencing unknown ids are ignored. These links are marked as high
+    confidence in the per-topic score."""
     toks = [tokenize(d["title"]) for d in docs]
 
     df: Dict[str, int] = defaultdict(int)
@@ -138,6 +144,21 @@ def build_topics(
             scores[i] = max(scores.get(i, 0), link)
             scores[j] = max(scores.get(j, 0), link)
 
+    # Force-link LLM-derived same-subject pairs (by doc id).
+    if extra_links:
+        idx_of = {d["id"]: i for i, d in enumerate(docs)}
+        for a, b in extra_links:
+            i, j = idx_of.get(a), idx_of.get(b)
+            if i is None or j is None:
+                continue
+            uf.union(i, j)
+            scores[i] = max(scores.get(i, 0), 0.95)
+            scores[j] = max(scores.get(j, 0), 0.95)
+
+    linked_ids = {i for pair in (extra_links or [])
+                  for i in (idx_of.get(pair[0]), idx_of.get(pair[1])) if i is not None} \
+        if extra_links else set()
+
     # Assemble components into topics.
     comp: Dict[int, List[int]] = defaultdict(list)
     for i in range(len(docs)):
@@ -162,6 +183,8 @@ def build_topics(
                 "cross_payer": len(sources) > 1,
                 "members": [docs[i]["id"] for i in members],
                 "score": round(max((scores.get(i, 0) for i in members), default=0.0), 3),
+                # True if an LLM same-subject link touched this (cross-payer) topic.
+                "llm_matched": len(sources) > 1 and any(i in linked_ids for i in members),
             }
         )
         tid += 1

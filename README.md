@@ -1,66 +1,206 @@
 # policydb
 
 Pull payer **medical & drug coverage policies** into a single queryable SQLite
-dataset, then compare them across competitors — via CLI or a deployable website.
+dataset, normalize and compare them across competitors with an LLM layer, and
+ship the result as a static comparison website.
+
+The question the project answers: **for the same drug or service, how do two
+insurers' coverage criteria differ — and which payer runs tighter
+utilization-management criteria** (a proxy for cost savings, weighed against
+member/provider abrasion)?
 
 Sources so far:
-- **Blue Cross Blue Shield of Florida** (https://mcgs.bcbsfl.com) — 754 policies
+- **Blue Cross Blue Shield of Florida** (https://mcgs.bcbsfl.com)
 - **Oscar Health** (https://www.hioscar.com/clinical-guidelines) — medical + pharmacy
 
-The design is source-agnostic — each new payer is one new *adapter*; extraction,
-schema, queries, cross-payer matching, and the website are shared.
+~1,150 policies total. The design is source-agnostic — each new payer is one new
+*adapter*; extraction, schema, matching, the LLM comparison, and the website are
+shared.
 
-## Website
+🔗 **Live site:** https://payer-policy-cmp-06222027.web.app
 
-`web/` is a React + Vite app (deploys to **Firebase Hosting**, data shipped as a
-static bundle — no DB billing) that shows **side-by-side comparisons** of equivalent
-policies across payers, plus full-text browse/search. Cross-payer topics are matched
-automatically (`policydb/match.py`). See [`web/README.md`](web/README.md) for build
-and deploy steps.
+---
 
-```bash
-python scripts/export_web.py --db data/policies.db --out web/public/data  # build bundle
-cd web && npm install && npm run dev                                       # preview
+## How it works (end-to-end flow)
+
 ```
+                pull            extract           export_web
+  payer sites ───────▶ SQLite ───────▶ text+fields ───────▶ static JSON bundle ──▶ website
+   (adapters)          policies.db                              ▲   ▲
+                                                                │   │
+                          llm_normalize ──▶ llm_profiles.json ──┘   │  (force-merge same-subject
+                          (1 call/policy)    llm_links.json ────────┘   pairs the title matcher missed)
+                                                                    │
+                              analyze --llm ──▶ analysis.json ──────┘
+                          (1 call/cross-payer topic: aligned
+                           criteria + restrictiveness verdict)
+```
+
+Each stage is a separate, re-runnable command. LLM calls are **cached on disk by
+content hash**, so re-running is incremental and free unless inputs change.
+
+### 1. Acquire — `scripts/pull.py` → `policydb/pipeline.py`
+Each payer has a `SourceAdapter` (`policydb/sources/`) that yields a catalog of
+documents and fetches each as a PDF. BCBS-FL is a stateful ASP.NET/Telerik site
+(sequential; see *How BCBS-FL works* below); Oscar is a Next.js/Contentful site
+whose PDFs live on a CDN (stateless, fetched in parallel). Results land in
+SQLite (`policydb/db.py`), with `content_hash` for change detection on re-pulls.
+
+### 2. Extract — `policydb/extract.py`
+PDF bytes → full text + structured fields (payer policy number, authoritative
+subject/title, effective & revision dates, CPT/HCPCS codes, page count). Pure
+function over bytes, source-agnostic.
+
+### 3. Normalize every policy (LLM, Phase 1) — `scripts/llm_normalize.py`
+One **Claude Haiku** call per policy distills it into a compact profile:
+`canonical_subject` (generic drug INN or standard service name), brand names,
+type, drug class, and the key medical-necessity requirements. Output is forced
+through a tool schema for valid structured JSON and cached per policy.
+
+This is the "pass every policy through the LLM" step. Its purpose is **matching
+recall**: the canonical subject is a payer-agnostic identity key, so the same
+drug can be linked across insurers even when their document *titles* differ
+(e.g. *"Ponvory (ponesimod) Tablet"* vs *"Ponesimod … (PG230)"*). It writes:
+- `data/llm_profiles.json` — `id → profile`
+- `data/llm_links.json` — conservative cross-payer same-subject link pairs
+
+Conservative linking (`policydb/llm_normalize.py: derive_links`): a drug links
+only on an exact generic **or** brand-name match; a service only on an exact
+canonical-subject match; class guidelines are left to the dedicated drug-family
+logic to avoid over-merging.
+
+### 4. Match into cross-payer topics — `policydb/match.py` via `scripts/export_web.py`
+Two signals, unioned with a union-find:
+1. **Lexical** — IDF-weighted cosine over normalized title tokens (with a light
+   stemmer and a rare-drug-name rescue), blocked by shared token to stay
+   sub-quadratic. Deterministic across runs (sorted reductions, fixed FP order).
+2. **LLM force-links** — the `data/llm_links.json` pairs from Phase 1, injected
+   as `extra_links`, merge same-subject policies the title matcher missed.
+
+A topic is flagged `llm_matched` **only when it is cross-payer solely because of
+the LLM links** — computed by a baseline diff against the pure lexical matcher,
+so the "AI-matched" badge reflects genuinely new matches, not ones merely
+re-confirmed. `export_web.py` writes the website bundle: `index.json`,
+`topics.json`, `meta.json`, per-policy `text/<id>.json`, and `drug_families.json`
+(Oscar drug-class guidelines mapped to BCBS per-drug policies, content-based —
+`policydb/drug_families.py`).
+
+### 5. Compare + score restrictiveness (LLM, Phase 3) — `scripts/analyze.py --llm`
+For each cross-payer topic, one **Claude Sonnet** call reads both payers'
+coverage-criteria text (following BCBS-FL's consolidation to its parent class
+guideline) and returns, via a forced tool schema:
+- a one-line plain-English **summary** of the key difference,
+- **shared** requirements, each marked `same` / `differs`,
+- requirements **unique to each payer**,
+- a **restrictiveness verdict** — which payer is harder to get approved under,
+  its magnitude, the rationale, and a cost-vs-abrasion note.
+
+`analyze.py` aggregates the verdicts into a "who runs tighter criteria" rollup
+and also emits the coverage-gap lists (topics only one payer publishes) and the
+hand-curated key findings (`data/analysis_findings.json`), re-pointing each
+finding's example links to current topic ids by drug token (ids renumber
+whenever matching changes). Output: `web/public/data/analysis.json`.
+
+> A regex-based fallback comparison (`SIGNALS` in `analyze.py`, and a client-side
+> criteria parser in `web/src/criteria.ts`) renders when the LLM layer hasn't
+> been run, so the site is fully functional without an API key.
+
+### 6. Serve — `web/` (React + Vite → Firebase Hosting)
+The site reads the static JSON bundle — **no database, no server, no billing**.
+See [`web/README.md`](web/README.md).
+
+---
+
+## Methodology notes
+
+- **Why an LLM layer at all?** Coverage criteria are dense, inconsistently
+  formatted clinical prose extracted from PDFs. Token/regex matching mislabels
+  paraphrases (e.g. *"12 months of age or older"* vs *"at least 12 months"*) and
+  can't reliably pull the right *section* out of a messy document. The LLM does
+  the semantic normalization, alignment, and restrictiveness judgment that rules
+  can't.
+- **Two model tiers for cost.** Haiku for the ~1,150 per-policy normalizations
+  (cheap, high-volume); Sonnet for the ~130 nuanced per-topic comparisons. Both
+  cached, so the whole enrichment is a bounded one-time cost.
+- **Structured output via forced tool-use** (`tool_choice` pinned to a single
+  tool) guarantees schema-valid JSON without relying on newer
+  structured-output APIs.
+- **Restrictiveness ≠ verdict on quality.** Tighter criteria likely lower
+  utilization and cost for that payer, *but* can drive member/provider abrasion;
+  the UI states this trade-off explicitly. In the current snapshot Oscar reads as
+  the more restrictive payer on the large majority of shared topics.
+- **Determinism & idempotence.** The lexical matcher is byte-stable run-to-run;
+  every LLM result is cached by a hash of (prompt version, model, inputs), so
+  pipelines are reproducible and re-runs only touch changed inputs.
+
+---
 
 ## Layout
 
 ```
 policydb/
   sources/base.py      SourceAdapter interface (catalog + fetch_document)
-  sources/bcbsfl.py    BCBS-FL adapter (see "How BCBS-FL works" below)
+  sources/bcbsfl.py    BCBS-FL adapter (stateful Telerik postbacks; see below)
   sources/oscar.py     Oscar adapter (Next.js/Contentful; stateless, parallel)
   extract.py           PDF -> text + parsed fields (policy#, subject, dates, CPT/HCPCS)
-  match.py             cross-payer topic clustering (IDF-cosine over titles)
+  match.py             cross-payer clustering: IDF-cosine titles + LLM force-links
+  drug_families.py     Oscar drug-class guideline ↔ BCBS per-drug mapping (content-based)
+  llm_normalize.py     Phase 1: per-policy LLM profile + conservative link derivation
+  llm_compare.py       Phase 3: per-topic LLM criteria comparison + restrictiveness
+  env.py               minimal .env loader (so keys needn't be exported in the shell)
   db.py                SQLite schema + FTS5 full-text index (self-migrating)
   pipeline.py          orchestration: catalog -> fetch -> extract -> store
 scripts/
   pull.py              CLI: pull a source into the dataset
   query.py             CLI: stats / search / show / compare
-  export_web.py        build the website's static data bundle
-web/                   React + Vite comparison site (Firebase Hosting)
-data/                  the SQLite dataset lives here (git-ignored)
+  llm_normalize.py     run Phase 1 over every policy -> profiles + links
+  export_web.py        build the website bundle (accepts --llm-links)
+  analyze.py           build analysis.json (--llm for the criteria comparison)
+web/                   React + Vite comparison + analysis site (Firebase Hosting)
+data/                  SQLite dataset + LLM artifacts (all git-ignored)
 ```
+
+---
 
 ## Usage
 
+### Build the dataset
 ```bash
-pip install requests pypdf            # deps
+pip install requests pypdf anthropic            # deps
 
-# Pull (BCBS-FL is ~757 documents; sequential, allow ~20-40 min)
+# Pull each payer (BCBS-FL is stateful/sequential; allow ~20-40 min)
 python scripts/pull.py bcbsfl --db data/policies.db
+python scripts/pull.py oscar  --db data/policies.db
 python scripts/pull.py bcbsfl --db data/policies.db --limit 20   # quick test
+```
 
-# Query
+### Query from the CLI
+```bash
 python scripts/query.py --db data/policies.db stats
 python scripts/query.py --db data/policies.db search "continuous glucose monitor"
 python scripts/query.py --db data/policies.db show 09-E0000-14
 python scripts/query.py --db data/policies.db compare "cgm" "glucose monitor"
 ```
 
-The dataset is a plain SQLite file — query it with any SQL tool, BI client, or
-pandas. Full-text search uses the `policies_fts` FTS5 table; structured fields
-(MCG number, dates, category, CPT codes) live in `policies`.
+### Run the LLM enrichment + build the website bundle
+The scripts read `ANTHROPIC_API_KEY` from a git-ignored `.env` (or the
+environment):
+```bash
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
+
+python -m scripts.llm_normalize --limit 20                  # smoke test
+python -m scripts.llm_normalize                             # ~1,150 Haiku calls (cached)
+python -m scripts.export_web --llm-links data/llm_links.json
+python -m scripts.analyze --llm                             # Sonnet comparison + restrictiveness
+
+cd web && npm install && npm run build                      # then `firebase deploy`
+```
+Every script takes `--model` to override the model; LLM results cache under
+`data/llm_cache/`, so re-runs and interruptions are cheap. Without `--llm` /
+`--llm-links` the pipeline still produces a working site using the regex
+fallback comparison.
+
+---
 
 ## Schema
 
@@ -68,7 +208,11 @@ pandas. Full-text search uses the `policies_fts` FTS5 table; structured fields
 `policy_id` (payer MCG#), `title` (site nav), `subject` (authoritative title from
 the PDF), `effective_date`, `revised_date`, `page_count`, `cpt_codes` (JSON),
 `full_text`, `content_hash` (change detection on re-pulls), `source_url`.
-`placements` holds each category a document is filed under.
+`placements` holds each category a document is filed under. Full-text search uses
+the `policies_fts` FTS5 table. It's a plain SQLite file — query it with any SQL
+tool, BI client, or pandas.
+
+---
 
 ## How BCBS-FL works (for maintainers)
 
@@ -95,8 +239,12 @@ the adapter:
 Titles/categories from the nav are treated as hints — the authoritative title,
 MCG number, and dates are parsed from the PDF content itself.
 
+---
+
 ## Adding a competitor
 
 Implement a `SourceAdapter` (`catalog()` yielding `CatalogEntry` rows, and
 `fetch_document()`), register it in `policydb/__init__.py`, and run `pull.py`.
-Stateless sites can set `sequential = False` to fetch in parallel.
+Stateless sites can set `sequential = False` to fetch in parallel. The matching,
+LLM enrichment, and website are payer-agnostic and pick up the new source
+automatically.

@@ -5,6 +5,15 @@ data/*.db-shm
 data/*.log
 data/pdfs/
 
+# LLM enrichment artifacts (regenerate via scripts/llm_normalize.py + analyze --llm)
+data/llm_cache/
+data/llm_profiles.json
+data/llm_links.json
+
+# secrets
+.env
+.env.*
+
 # macOS
 .DS_Store
 
