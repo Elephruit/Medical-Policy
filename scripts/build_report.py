@@ -21,7 +21,6 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "web" / "public" / "data"
 OUT = ROOT / "report"
 REPO = "https://github.com/Elephruit/Medical-Policy"
-SITE = "https://payer-policy-cmp-06222027.web.app"
 AUTHOR = "Mike Zehrer"
 BRAND = "#1f9bd6"
 BRAND_DK = "#127bb0"
@@ -186,16 +185,30 @@ def build():
         f"policies. A genuine gap analysis has to read content, not count documents.",
         None,
     ))
-    # concrete examples
+    # concrete examples — "Stricter: <payer>" with a 3-step dash meter for magnitude
+    MAG = {"minor": 1, "moderate": 2, "substantial": 3}
+
+    def ex_tag(c):
+        label = c["label"]
+        rr = c["llm"].get("restrictiveness", {})
+        who, mag = rr.get("more_restrictive", ""), rr.get("magnitude", "")
+        # Cases where the criteria text wasn't comparable: don't assert a winner.
+        if "empaveli" in label.lower():
+            return '<span class="ex-tag ex-even">differing clinical policies</span>'
+        if who in ("Oscar", "Florida Blue") and mag in MAG:
+            short = "FL Blue" if who == "Florida Blue" else "Oscar"
+            cls = "fl" if who == "Florida Blue" else "os"
+            n = MAG[mag]
+            meter = "".join(f'<i class="{"on" if i < n else "off"}"></i>' for i in range(3))
+            return (f'<span class="ex-tag ex-{cls}">Stricter: {short}'
+                    f'<span class="meter">{meter}</span></span>')
+        return '<span class="ex-tag ex-even">comparable criteria</span>'
+
     ex_rows = []
     for c in divergent[:5]:
-        rr = c["llm"].get("restrictiveness", {})
-        who = rr.get("more_restrictive", "")
-        cls = "os" if who == "Oscar" else ("fl" if who == "Florida Blue" else "even")
-        tag = f'{who} {rr.get("magnitude","")}'.strip() if who and who != "neither" else "comparable"
         ex_rows.append(
             f'<div class="ex"><div class="ex-h"><span class="ex-name">{e(c["label"])}</span>'
-            f'<span class="ex-tag ex-{cls}">{e(tag)}</span></div>'
+            f'{ex_tag(c)}</div>'
             f'<p>{e(c["llm"].get("summary",""))}</p></div>'
         )
     findings.append((
@@ -274,7 +287,11 @@ p {{ margin: 0; }}
 .ex {{ border: 1px solid #e6e9ef; border-radius: 10px; padding: 11px 13px; break-inside: avoid; }}
 .ex-h {{ display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; }}
 .ex-name {{ font-weight: 700; font-size: 10.5pt; }}
-.ex-tag {{ font-size: 8.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 5px; white-space: nowrap; }}
+.ex-tag {{ font-size: 8.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 3px 8px; border-radius: 5px; white-space: nowrap; display: inline-flex; align-items: center; }}
+.meter {{ display: inline-flex; gap: 2px; margin-left: 6px; }}
+.meter i {{ width: 9px; height: 3px; border-radius: 2px; background: #cfd6df; display: inline-block; }}
+.ex-os .meter i.on {{ background: {OS_C}; }}
+.ex-fl .meter i.on {{ background: {FL_C}; }}
 .ex-os {{ color: {OS_C}; background: #fdeee4; }} .ex-fl {{ color: {FL_C}; background: #e7eefb; }} .ex-even {{ color:#475569; background:#eef1f5; }}
 .ex p {{ font-size: 9.5pt; color: #2a3744; }}
 
@@ -326,8 +343,7 @@ p {{ margin: 0; }}
       coverage policies — where the two payers agree, where their requirements diverge, and which payer
       runs the tighter utilization-management criteria.</p>
     <div class="byline">Prepared by <b>{AUTHOR}</b> · {today}</div>
-    <div class="byline links">Interactive site: <a href="{SITE}">{SITE.replace('https://','')}</a><br>
-      Source &amp; methodology: <a href="{REPO}">{REPO.replace('https://','')}</a></div>
+    <div class="byline links">Source &amp; methodology: <a href="{REPO}">{REPO.replace('https://','')}</a></div>
   </div>
   <div class="cover-bot">
     <span>Analysis &amp; engineering by {AUTHOR}</span>
@@ -402,7 +418,7 @@ p {{ margin: 0; }}
     run-to-run; LLM results cache by (prompt version, model, inputs) — re-runs touch only changed
     inputs.</p></div>
   <div class="p"><h5>Decision support, not ground truth</h5><p>Restrictiveness is an LLM judgment over
-    PDF-extracted text; every claim links back to the source criteria on the interactive site.</p></div>
+    PDF-extracted text; the source criteria are preserved alongside every comparison for review.</p></div>
 </div>
 
 <div class="foot">
