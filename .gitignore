@@ -1,0 +1,15 @@
+# datasets & downloaded artifacts
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.log
+data/pdfs/
+
+# macOS
+.DS_Store
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
