@@ -1,23 +1,41 @@
-# policydb
+<div align="center">
 
-Pull payer **medical & drug coverage policies** into a single queryable SQLite
-dataset, normalize and compare them across competitors with an LLM layer, and
-ship the result as a static comparison website.
+<img src="report/elephruit-logo.png" alt="Elephruit" height="58">
 
-The question the project answers: **for the same drug or service, how do two
-insurers' coverage criteria differ — and which payer runs tighter
-utilization-management criteria** (a proxy for cost savings, weighed against
-member/provider abrasion)?
+<h1>Payer Coverage Policy Intelligence</h1>
 
-Sources so far:
-- **Blue Cross Blue Shield of Florida** (https://mcgs.bcbsfl.com)
-- **Oscar Health** (https://www.hioscar.com/clinical-guidelines) — medical + pharmacy
+<p><b>Scrape, normalize, and LLM-compare U.S. health-insurer coverage policies — then ship it as an interactive site and a branded findings report.</b></p>
 
-~1,150 policies total. The design is source-agnostic — each new payer is one new
-*adapter*; extraction, schema, matching, the LLM comparison, and the website are
-shared.
+<p>
+<a href="https://payer-policy-cmp-06222027.web.app"><img src="https://img.shields.io/badge/%E2%96%B6_Live_demo-Florida_Blue_vs_Oscar-1f9bd6?style=for-the-badge" alt="Live demo"></a>
+<a href="report/Coverage-Comparison-FloridaBlue-vs-Oscar.pdf"><img src="https://img.shields.io/badge/%F0%9F%93%84_Findings_report-PDF-127bb0?style=for-the-badge" alt="Findings report PDF"></a>
+</p>
 
-🔗 **Live site:** https://payer-policy-cmp-06222027.web.app
+<p>
+<img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white" alt="Python">
+<img src="https://img.shields.io/badge/React-Vite-61DAFB?logo=react&logoColor=white" alt="React + Vite">
+<img src="https://img.shields.io/badge/SQLite-FTS5-003B57?logo=sqlite&logoColor=white" alt="SQLite">
+<img src="https://img.shields.io/badge/Claude-Haiku_+_Sonnet-D97757?logo=anthropic&logoColor=white" alt="Claude">
+<img src="https://img.shields.io/badge/Firebase-Hosting-FFCA28?logo=firebase&logoColor=black" alt="Firebase Hosting">
+</p>
+
+</div>
+
+> **What this answers:** for the same drug or service, how do two insurers' coverage criteria
+> differ — and **which payer runs tighter utilization-management criteria** (a proxy for cost
+> savings, weighed against member/provider abrasion)? On the current data, **Oscar runs the tighter
+> criteria on ~73% of overlapping topics.**
+
+<p align="center">
+  <a href="report/Coverage-Comparison-FloridaBlue-vs-Oscar.pdf">
+    <img src="docs/report-cover.png" width="480" alt="Findings report cover" style="border:1px solid #e6e9ef;border-radius:8px">
+  </a>
+</p>
+
+**Sources:** Blue Cross Blue Shield of Florida (`mcgs.bcbsfl.com`) · Oscar Health
+(`hioscar.com/clinical-guidelines`, medical + pharmacy) — **~1,150 policies**. The design is
+source-agnostic: each new payer is one new *adapter*; extraction, schema, matching, the LLM
+comparison, the website, and the report are shared.
 
 ---
 

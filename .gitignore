@@ -32,6 +32,5 @@ web/public/data/
 package-lock.json
 
 # generated report artifacts (regenerate via scripts/build_report.py)
-report/*.pdf
 report/*.html
 report/_*.png

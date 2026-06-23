@@ -29,18 +29,18 @@ FL_C = "#1d4ed8"
 OS_C = "#ea580c"
 
 CANON = [
-    (r"specialist|ologist|prescriber", "Specialist-prescriber gate"),
+    (r"specialist|ologist|prescriber", "Specialist gate"),
     (r"\bage\b|months of age|years of age", "Age limit"),
     (r"step therapy|tried|failed|trial of|prior therap|inadequate", "Step therapy"),
-    (r"continuation|continued|reauth|re-auth", "Continuation-of-therapy rules"),
-    (r"duration|approval period|approval length|authorization period", "Approval-duration limit"),
+    (r"continuation|continued|reauth|re-auth", "Continuation rules"),
+    (r"duration|approval period|approval length|authorization period", "Approval-duration cap"),
     (r"prior authorization|prior auth|preauth", "Prior authorization"),
-    (r"genetic|mutation|biomarker|allele", "Genetic / biomarker testing"),
+    (r"genetic|mutation|biomarker|allele", "Genetic testing"),
     (r"diagnos", "Diagnosis confirmation"),
-    (r"dose|dosing|quantity|weight|bsa|body surface", "Dose / quantity limit"),
+    (r"dose|dosing|quantity|weight|bsa|body surface", "Dose / quantity cap"),
     (r"document|chart|medical record|labor", "Documentation"),
-    (r"experimental|investigational|not medically|exclus|non-covered", "Exclusions / non-covered uses"),
-    (r"lab|test|titer|level|screen", "Lab / testing requirement"),
+    (r"experimental|investigational|not medically|exclus|non-covered", "Exclusions / non-covered"),
+    (r"lab|test|titer|level|screen", "Lab / testing"),
 ]
 
 
@@ -244,9 +244,9 @@ p {{ margin: 0; }}
 .blegend {{ display: flex; gap: 18px; font-size: 9.5pt; color: #6b7686; }}
 .blegend i {{ display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }}
 
-.bars {{ display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }}
-.bar {{ display: grid; grid-template-columns: 92px 1fr 22px; align-items: center; gap: 8px; font-size: 9.5pt; }}
-.bl {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.bars {{ display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }}
+.bar {{ display: grid; grid-template-columns: 120px 1fr 20px; align-items: center; gap: 9px; font-size: 9pt; }}
+.bl {{ line-height: 1.15; }}
 .bt {{ background: #eef1f5; border-radius: 5px; height: 13px; overflow: hidden; }}
 .bf {{ display: block; height: 100%; border-radius: 5px; }}
 .bn {{ font-weight: 700; text-align: right; }}
@@ -270,6 +270,17 @@ p {{ margin: 0; }}
 .method {{ background: #f6fbfe; border: 1px solid #d6ecf8; border-radius: 12px; padding: 16px 18px; font-size: 10pt; color: #2a3744; line-height: 1.6; }}
 .method b {{ color: {BRAND_DK}; }}
 .pipe {{ font-family: ui-monospace, Menlo, monospace; font-size: 8.5pt; color: #44525f; background: #fff; border: 1px solid #d6ecf8; border-radius: 8px; padding: 10px 12px; margin-top: 10px; white-space: pre; overflow-x: auto; }}
+
+.appx {{ break-before: page; }}
+.stage {{ display: grid; grid-template-columns: 26px 1fr; gap: 12px; margin: 0 0 13px; break-inside: avoid; }}
+.stage-n {{ font-size: 12pt; font-weight: 800; color: {BRAND}; }}
+.stage h4 {{ font-size: 11pt; margin-bottom: 3px; }}
+.stage p {{ font-size: 9.5pt; color: #2a3744; }}
+.stage code {{ font-family: ui-monospace, Menlo, monospace; font-size: 8.5pt; background: #eef4f8; padding: 1px 4px; border-radius: 4px; color: {BRAND_DK}; }}
+.princ {{ margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
+.princ .p {{ border: 1px solid #e6e9ef; border-radius: 10px; padding: 11px 13px; break-inside: avoid; }}
+.princ h5 {{ margin: 0 0 3px; font-size: 9.5pt; color: {BRAND_DK}; }}
+.princ p {{ margin: 0; font-size: 9pt; color: #44525f; line-height: 1.5; }}
 
 .foot {{ margin-top: 30px; border-top: 1px solid #e6e9ef; padding-top: 12px; display: flex; justify-content: space-between; font-size: 9pt; color: #6b7686; }}
 .foot a {{ color: {BRAND_DK}; text-decoration: none; }}
@@ -319,6 +330,60 @@ p {{ margin: 0; }}
   cached, reproducible cost.
   <div class="pipe">scrape → extract (PDF→text) → LLM normalize (canonical subject) → match
        → LLM compare + restrictiveness score → static site + this report</div>
+</div>
+
+<div class="appx">
+<div class="sec-h">Appendix · Methodology &amp; technical flow</div>
+<p class="section-sub" style="color:#44525f;font-size:10pt;margin-bottom:18px;max-width:165mm">
+  The full pipeline is open source at <b style="color:{BRAND_DK}">{REPO.replace('https://','')}</b>.
+  Each stage is a separate, re-runnable command; every LLM call is cached on disk by a content hash,
+  so the analysis is incremental and reproducible.</p>
+
+<div class="stage"><div class="stage-n">1</div><div>
+  <h4>Acquire</h4><p>A per-payer <code>SourceAdapter</code> yields a catalog and fetches each policy
+  PDF. Florida Blue is a stateful ASP.NET/Telerik site crawled by replaying postbacks (sequential);
+  Oscar is a Next.js/Contentful site whose PDFs live on a CDN (stateless, parallel). Documents land in
+  SQLite with a content hash for change detection.</p></div></div>
+
+<div class="stage"><div class="stage-n">2</div><div>
+  <h4>Extract</h4><p>PDF bytes → full text plus structured fields (policy number, authoritative
+  subject, effective/revision dates, CPT/HCPCS codes). Source-agnostic.</p></div></div>
+
+<div class="stage"><div class="stage-n">3</div><div>
+  <h4>Normalize every policy &nbsp;<span style="color:{BRAND_DK};font-weight:700;font-size:9pt">LLM · fast model</span></h4>
+  <p>One call per policy distills it to a <b>canonical subject</b> (generic drug INN or standard
+  service name), brand names, type, and key requirements — a payer-agnostic identity key. This is what
+  lets the same drug match across insurers when their document titles differ.</p></div></div>
+
+<div class="stage"><div class="stage-n">4</div><div>
+  <h4>Match into cross-payer topics</h4><p>A union-find combines two signals: deterministic
+  IDF-weighted cosine over title tokens (token-blocked, byte-stable), plus conservative LLM
+  same-subject links from stage 3. A topic is flagged <i>AI-matched</i> only when it is cross-payer
+  <i>solely</i> because of the LLM links — verified by a baseline diff against the lexical matcher.</p></div></div>
+
+<div class="stage"><div class="stage-n">5</div><div>
+  <h4>Compare &amp; score restrictiveness &nbsp;<span style="color:{BRAND_DK};font-weight:700;font-size:9pt">LLM · stronger model</span></h4>
+  <p>For each overlapping topic, one call reads both payers' criteria and returns an aligned
+  comparison — shared requirements (flagged same/differs), requirements unique to each payer, and a
+  restrictiveness verdict (which payer is harder to get approved under, with rationale and a
+  cost-vs-abrasion note).</p></div></div>
+
+<div class="stage"><div class="stage-n">6</div><div>
+  <h4>Serve</h4><p>Everything exports to a static JSON bundle behind a React/Vite site on Firebase
+  Hosting — no database, no server — and to this report.</p></div></div>
+
+<div class="princ">
+  <div class="p"><h5>Two-tier model strategy</h5><p>A fast model for the {s['total_policies']:,}
+    high-volume normalizations; a stronger model for the ~{len(llm)} nuanced comparisons. Bounded,
+    cached, one-time cost.</p></div>
+  <div class="p"><h5>Structured output</h5><p>Forced tool-use pins each call to a single schema, so
+    every result is valid JSON without bespoke parsing.</p></div>
+  <div class="p"><h5>Determinism &amp; idempotence</h5><p>The lexical matcher is byte-stable
+    run-to-run; LLM results cache by (prompt version, model, inputs) — re-runs touch only changed
+    inputs.</p></div>
+  <div class="p"><h5>Decision support, not ground truth</h5><p>Restrictiveness is an LLM judgment over
+    PDF-extracted text; every claim links back to the source criteria on the interactive site.</p></div>
+</div>
 </div>
 
 <div class="foot">
